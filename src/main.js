@@ -77,47 +77,64 @@ function renderBudgetPlanner() {
   const depts = INDUSTRIES[selectedIndustry];
   const annualTotal = budget.monthlyRevenue * 12 * budget.laborRatio / 100;
   const defaultShare = Math.round(100 / depts.length);
+
   let deptRows = depts.map((d, i) => {
     const hc = budget.headcounts[d] || 3;
-    const share = i < depts.length - 1 ? defaultShare : 100 - defaultShare * (depts.length - 1);
-    const deptBudget = Math.round(annualTotal * share / 100);
     return `<div class="bp-dept">
       <span class="bp-dname">${d}</span>
-      <input type="number" value="${hc}" min="1" max="200" oninput="window.updBudgetHeadcount('${d}',this.value)">
+      <input type="number" value="${hc}" min="1" max="200" onchange="window.updBudgetHeadcount('${d}',this.value)">
       <span style="font-size:12px;color:#90a4ae;">人</span>
-      <span class="bp-dbudget">NT$${(deptBudget/10000).toFixed(0)}萬</span>
+      <span class="bp-dbudget" id="bd-${d}"></span>
     </div>`;
   }).join('');
 
   el.innerHTML = `
     <div class="bp-title">
       📊 預算規劃
-      <span class="toggle" onclick="this.parentElement.nextElementSibling.classList.toggle('hidden')">收合</span>
+      <span class="toggle" onclick="document.getElementById('bpBody').classList.toggle('hidden')">收合</span>
     </div>
     <div id="bpBody">
       <div class="bp-row">
-        <div class="bp-field"><label>月營業額目標（萬）</label><input type="number" value="${budget.monthlyRevenue}" min="10" max="999999" oninput="window.updBudget('revenue',this.value)"></div>
-        <div class="bp-field"><label>人事成本比例 %（建議 ${range.min}%-${range.max}%）</label><input type="number" value="${budget.laborRatio}" min="1" max="100" step="0.5" oninput="window.updBudget('ratio',this.value)"></div>
+        <div class="bp-field"><label>月營業額目標（萬）</label><input type="number" id="bpRevenue" value="${budget.monthlyRevenue}" min="10" max="999999" onchange="window.updBudget('revenue',this.value)"></div>
+        <div class="bp-field"><label>人事成本比例 %（建議 ${range.min}%-${range.max}%）</label><input type="number" id="bpRatio" value="${budget.laborRatio}" min="1" max="100" step="0.5" onchange="window.updBudget('ratio',this.value)"></div>
         <div class="bp-field" style="display:flex;align-items:flex-end;gap:8px;">
           <button class="bp-apply" onclick="window.applyBudget()">套用至部門</button>
           <button class="btn" onclick="window.resetBudget()">重設</button>
         </div>
       </div>
-      <div class="bp-total">年人事總預算 <strong>NT$ ${(annualTotal/10000).toFixed(0)} 萬</strong> <small>（月均 NT$ ${(annualTotal/12/10000).toFixed(0)} 萬）</small></div>
-      <div class="bp-depts">${deptRows}</div>
+      <div class="bp-total">年人事總預算 <strong id="bpTotal">NT$ ${(annualTotal/10000).toFixed(0)} 萬</strong> <small id="bpMonthly">（月均 NT$ ${(annualTotal/12/10000).toFixed(0)} 萬）</small></div>
+      <div class="bp-depts" id="bpDepts">${deptRows}</div>
       <div class="bp-hint">💡 調整各部門人數後，系統自動按比例分配預算。點「套用至部門」將預算寫入部門卡片。</div>
     </div>`;
+  updateBudgetDisplay();
+}
+
+function updateBudgetDisplay() {
+  const depts = INDUSTRIES[selectedIndustry];
+  if (!depts) return;
+  const annualTotal = budget.monthlyRevenue * 12 * budget.laborRatio / 100;
+  const defaultShare = Math.round(100 / depts.length);
+  const totalEl = document.getElementById('bpTotal');
+  const monthEl = document.getElementById('bpMonthly');
+  if (totalEl) totalEl.textContent = `NT$ ${(annualTotal/10000).toFixed(0)} 萬`;
+  if (monthEl) monthEl.textContent = `（月均 NT$ ${(annualTotal/12/10000).toFixed(0)} 萬）`;
+  depts.forEach((d, i) => {
+    const share = i < depts.length - 1 ? defaultShare : 100 - defaultShare * (depts.length - 1);
+    const deptBudget = Math.round(annualTotal * share / 100);
+    const bdEl = document.getElementById(`bd-${d}`);
+    if (bdEl) bdEl.textContent = `NT$${(deptBudget/10000).toFixed(0)}萬`;
+  });
 }
 
 window.updBudget = function(field, val) {
   if (field === 'revenue') budget.monthlyRevenue = parseFloat(val) || 500;
   if (field === 'ratio') budget.laborRatio = parseFloat(val) || 25;
-  renderBudgetPlanner();
+  updateBudgetDisplay();
 };
 
 window.updBudgetHeadcount = function(dept, val) {
   budget.headcounts[dept] = parseInt(val) || 1;
-  renderBudgetPlanner();
+  updateBudgetDisplay();
 };
 
 window.resetBudget = function() {
