@@ -17,7 +17,7 @@ onAuthChange((event, user) => {
     document.getElementById('userName').textContent = user.user_metadata?.full_name || user.email;
     document.getElementById('userAvatar').src = user.user_metadata?.avatar_url || '';
     initApp();
-    showTutorial();
+    showTutorial(true);
   } else {
     currentUser = null;
     document.getElementById('login-screen').classList.remove('hidden');
@@ -33,7 +33,7 @@ getCurrentUser().then(user => {
     document.getElementById('userName').textContent = user.user_metadata?.full_name || user.email;
     document.getElementById('userAvatar').src = user.user_metadata?.avatar_url || '';
     initApp();
-    showTutorial();
+    showTutorial(true);
   }
 });
 
@@ -64,6 +64,31 @@ async function refreshPlanList() {
     </div>`
   ).join('');
 }
+
+// ── Live Recalculation ──
+function attachLiveCalc(root) {
+  root.querySelectorAll('input:not([type="checkbox"]):not([type="hidden"]), select').forEach(el => {
+    el.addEventListener('input', () => window.doCalculate());
+  });
+  root.querySelectorAll('input[type="checkbox"]').forEach(el => {
+    el.addEventListener('change', () => window.doCalculate());
+  });
+}
+const _origAddStepRow = window.addStepRowDOM || addStepRowDOM;
+function addStepRowLive(th, rt, idx) {
+  addStepRowDOM(th, rt, idx);
+  const lastRow = document.getElementById('stepBody').lastElementChild;
+  if (lastRow) attachLiveCalc(lastRow);
+}
+window.addStepRow = function() { addStepRowLive(); };
+
+const _origAddCbRow = addCbRowDOM;
+function addCbRowLive(amt, rt, total, ful) {
+  addCbRowDOM(amt, rt, total, ful);
+  const lastRow = document.getElementById('cbBody').lastElementChild;
+  if (lastRow) attachLiveCalc(lastRow);
+}
+window.addCbRow = function() { addCbRowLive(); };
 
 // ── Form Rendering ──
 function renderForm(config) {
@@ -189,6 +214,9 @@ function renderForm(config) {
   document.getElementById('fHardThreshold')?.addEventListener('change', function() {
     document.getElementById('hardThresholdOptions').classList.toggle('hidden', !this.checked);
   });
+
+  // Live calc on all form fields
+  attachLiveCalc(document.getElementById('inputCol'));
 }
 
 // ── Step Row DOM ──
@@ -504,13 +532,15 @@ const tutorialSteps = [
 ];
 let tutorialStep = 0;
 
-function showTutorial() {
+function showTutorial(firstTime) {
   const overlay = document.getElementById('tutorialOverlay');
-  if (!overlay || localStorage.getItem('tutorialDone')) return;
+  if (!overlay) return;
+  if (firstTime && localStorage.getItem('tutorialDone')) return;
   overlay.classList.remove('hidden');
   tutorialStep = 0;
   renderTutorialStep();
 }
+window.showTutorial = showTutorial;
 
 function renderTutorialStep() {
   const step = tutorialSteps[tutorialStep];
