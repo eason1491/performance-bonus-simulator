@@ -370,13 +370,16 @@ export const DEFAULT_GRADES = [
 
 // ── 預算佔用率健康判斷 ──
 export function calcHealth(laborRatio, bench) {
-  if (!bench) return { text: '—', color: '#94a3b8', bg: '#f8fafc' };
+  if (!bench) { console.log('calcHealth: no bench'); return { text: '—', color: '#94a3b8', bg: '#f8fafc' }; }
   const range = parseRange(bench.laborRate);
   const r = Number(laborRatio);
-  if (r < range.min * 0.8) return { text: '⚠️ 偏低', color: '#f59e0b', bg: '#fffbeb' };
-  if (r <= range.max) return { text: '✅ 很健康', color: '#10b981', bg: '#f0fdf4' };
-  if (r <= range.max * 1.3) return { text: '⚡ 有問題', color: '#f97316', bg: '#fff7ed' };
-  return { text: '🔴 有危險', color: '#ef4444', bg: '#fef2f2' };
+  const min = range.min;
+  const max = range.max;
+  console.log('calcHealth:', { r, min, max, laborRate: bench.laborRate, compare: [r < min * 0.8, r <= max, r <= max * 1.3] });
+  if (r < min * 0.8) { console.log('→偏低'); return { text: '⚠️ 偏低', color: '#f59e0b', bg: '#fffbeb' }; }
+  if (r <= max) { console.log('→很健康'); return { text: '✅ 很健康', color: '#10b981', bg: '#f0fdf4' }; }
+  if (r <= max * 1.3) { console.log('→有問題'); return { text: '⚡ 有問題', color: '#f97316', bg: '#fff7ed' }; }
+  console.log('→有危險'); return { text: '🔴 有危險', color: '#ef4444', bg: '#fef2f2' };
 }
 
 export function parseRange(str) {
