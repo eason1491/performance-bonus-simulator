@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>績效獎金產出模擬器</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #333; padding: 20px; max-width: 1200px; margin: 0 auto; }
+h1 { font-size: 26px; margin-bottom: 8px; color: #1a1a2e; }
+.subtitle { color: #666; margin-bottom: 24px; font-size: 14px; }
+.row { display: flex; gap: 20px; flex-wrap: wrap; }
+.col { flex: 1; min-width: 300px; }
+.card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.card h2 { font-size: 16px; margin-bottom: 14px; color: #1a1a2e; padding-bottom: 8px; border-bottom: 2px solid #e8e8e8; }
+.form-group { margin-bottom: 10px; }
+.form-group label { display: block; font-size: 12px; color: #888; margin-bottom: 2px; }
+.form-group input, .form-group select { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+.form-group input:focus, .form-group select:focus { outline: none; border-color: #4361ee; }
+.form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.form-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.btn-primary { width: 100%; padding: 12px; background: #4361ee; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.btn-primary:hover { background: #3a56d4; }
+.btn-secondary { padding: 8px 16px; background: #e8e8e8; color: #333; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.btn-secondary:hover { background: #d4d4d4; }
+.tab-bar { display: flex; gap: 0; margin-bottom: 16px; background: #e8e8e8; border-radius: 8px; overflow: hidden; }
+.tab-btn { flex: 1; padding: 10px; border: none; background: transparent; font-size: 13px; cursor: pointer; font-weight: 500; transition: all .2s; }
+.tab-btn.active { background: #4361ee; color: #fff; }
+.result-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 10px; margin: 12px 0; }
+.result-item { background: #f8f9fa; border-radius: 8px; padding: 12px; text-align: center; }
+.result-item .label { font-size: 11px; color: #888; }
+.result-item .value { font-size: 20px; font-weight: 700; margin-top: 2px; }
+.result-item.highlight { background: #4361ee; color: #fff; }
+.result-item.highlight .label { color: rgba(255,255,255,.7); }
+.result-item.danger { background: #e74c3c; color: #fff; }
+.result-item.danger .label { color: rgba(255,255,255,.7); }
+.result-item.success { background: #27ae60; color: #fff; }
+.result-item.success .label { color: rgba(255,255,255,.7); }
+.breakdown-table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0; }
+.breakdown-table th { text-align: left; font-size: 12px; color: #888; padding: 6px 8px; border-bottom: 2px solid #eee; }
+.breakdown-table td { padding: 8px; border-bottom: 1px solid #eee; }
+.breakdown-table .text-right { text-align: right; }
+.breakdown-table .total-row { background: #eef2ff; font-weight: 600; }
+.breakdown-table .deduction-row { background: #fff5f5; color: #e74c3c; }
+.warning-box { background: #fff8e1; border-left: 4px solid #ffc107; padding: 12px; border-radius: 6px; margin: 8px 0; font-size: 13px; }
+.success-box { background: #e8f8f0; border-left: 4px solid #27ae60; padding: 12px; border-radius: 6px; margin: 8px 0; font-size: 13px; }
+.danger-box { background: #fff0f0; border-left: 4px solid #e74c3c; padding: 12px; border-radius: 6px; margin: 8px 0; font-size: 13px; }
+.health-meter { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+.health-item { flex: 1; min-width: 140px; padding: 10px; border-radius: 8px; text-align: center; font-size: 13px; }
+.health-item .val { font-size: 18px; font-weight: 700; }
+.top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+@media (max-width: 600px) {
+  .form-row2, .form-row3 { grid-template-columns: 1fr; }
+  .result-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div>
+    <h1>績效獎金產出模擬器</h1>
+    <div class="subtitle">3PM 模型 · 階梯加速器 · CSAT 調節 · Clawback 扣回</div>
+  </div>
+  <button class="btn-secondary" onclick="loadExample()">載入範例</button>
+</div>
+
+<!-- Tab -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('calc',this)">計算器</button>
+  <button class="tab-btn" onclick="switchTab('logic',this)">邏輯與公式</button>
+</div>
+
+<!-- ====== 計算器 Tab ====== -->
+<div id="tab-calc">
+<div class="row">
+  <!-- 左欄：輸入 -->
+  <div class="col">
+    <div class="card">
+      <h2>基本設定</h2>
+      <div class="form-row2">
+        <div class="form-group">
+          <label>職務形狀</label>
+          <select id="jobType">
+            <option value="上山型">上山型（業務/銷售）</option>
+            <option value="平路型">平路型（行政/管理）</option>
+            <option value="下山型">下山型（研發/技術）</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>獎金類型</label>
+          <select id="bonusType">
+            <option value="commission">銷售佣金制</option>
+            <option value="mbo">MBO/KPI 目標管理</option>
+            <option value="comprehensive">年度綜合獎金</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row3">
+        <div class="form-group">
+          <label>底薪（年/萬）</label>
+          <input type="number" id="baseSalary" value="120" min="0" step="1">
+        </div>
+        <div class="form-group">
+          <label>預期獎金（年/萬）</label>
+          <input type="number" id="targetBonus" value="120" min="0" step="1">
+        </div>
+        <div class="form-group">
+          <label>法定外加成本 %</label>
+          <input type="number" id="overheadRate" value="20" min="0" step="1">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>業績與佣金設定</h2>
+      <div class="form-row2">
+        <div class="form-group">
+          <label>年度目標（萬）</label>
+          <input type="number" id="quota" value="1440" min="0" step="1">
+        </div>
+        <div class="form-group">
+          <label>實際達成（萬）</label>
+          <input type="number" id="actual" value="1800" min="0" step="1">
+        </div>
+      </div>
+      <div class="form-row3">
+        <div class="form-group">
+          <label>第1階提撥率 %（0-80%）</label>
+          <input type="number" id="tier1Rate" value="5" min="0" step="0.5">
+        </div>
+        <div class="form-group">
+          <label>第2階提撥率 %（81-100%）</label>
+          <input type="number" id="tier2Rate" value="10" min="0" step="0.5">
+        </div>
+        <div class="form-group">
+          <label>第3階提撥率 %（100%+）</label>
+          <input type="number" id="tier3Rate" value="15" min="0" step="0.5">
+        </div>
+      </div>
+      <div class="form-row2">
+        <div class="form-group">
+          <label>銷售成本 COGS %</label>
+          <input type="number" id="cogsRate" value="20" min="0" step="1">
+        </div>
+        <div class="form-group">
+          <label>毛利佣金比例 %</label>
+          <input type="number" id="grossMarginRate" value="15" min="0" step="1">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>KPI / CSAT 調節</h2>
+      <div class="form-row2">
+        <div class="form-group">
+          <label>KPI 綜合得分（0-1.2）</label>
+          <input type="number" id="kpiScore" value="0.95" min="0" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>KPI 權重 %</label>
+          <input type="number" id="kpiWeight" value="100" min="0" max="100" step="1">
+        </div>
+      </div>
+      <div class="form-row2">
+        <div class="form-group">
+          <label>CSAT 目標（/5）</label>
+          <input type="number" id="csatTarget" value="4.5" min="0" step="0.1">
+        </div>
+        <div class="form-group">
+          <label>CSAT 實際（/5）</label>
+          <input type="number" id="csatActual" value="4.2" min="0" step="0.1">
+        </div>
+      </div>
+      <div class="form-row2">
+        <div class="form-group">
+          <label>CSAT 未達標折扣 %</label>
+          <input type="number" id="csatPenalty" value="10" min="0" step="1">
+        </div>
+        <div class="form-group">
+          <label>行為職能係數（0.8-1.2）</label>
+          <input type="number" id="behaviorMod" value="1.0" min="0.8" max="1.2" step="0.05">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Clawback 追回設定</h2>
+      <div class="form-row2">
+        <div class="form-group">
+          <label>該筆訂單金額（萬）</label>
+          <input type="number" id="cbAmount" value="120" min="0" step="1">
+        </div>
+        <div class="form-group">
+          <label>佣金提撥率 %</label>
+          <input type="number" id="cbRate" value="10" min="0" step="1">
+        </div>
+      </div>
+      <div class="form-row2">
+        <div class="form-group">
+          <label>合約月數</label>
+          <input type="number" id="cbTotalMonths" value="12" min="1" step="1">
+        </div>
+        <div class="form-group">
+          <label>已履行月數</label>
+          <input type="number" id="cbFulfilledMonths" value="4" min="0" step="1">
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="calculate()">計算獎金</button>
+  </div>
+
+  <!-- 右欄：結果 -->
+  <div class="col">
+    <div class="card">
+      <h2>獎金摘要</h2>
+      <div id="resultSummary">
+        <div class="result-grid" id="summaryGrid">
+          <div class="result-item"><div class="label">達成率</div><div class="value" id="rAchieve">—</div></div>
+          <div class="result-item highlight"><div class="label">最終獎金</div><div class="value" id="rFinalBonus">—</div></div>
+          <div class="result-item"><div class="label">原始佣金</div><div class="value" id="rGrossCommission">—</div></div>
+          <div class="result-item danger"><div class="label">Clawback 扣回</div><div class="value" id="rClawback">—</div></div>
+        </div>
+        <div class="result-grid">
+          <div class="result-item success"><div class="label">實領年薪</div><div class="value" id="rTotalPay">—</div></div>
+          <div class="result-item"><div class="label">勞動分配率</div><div class="value" id="rLaborRate">—</div></div>
+          <div class="result-item"><div class="label">Compa-Ratio</div><div class="value" id="rCompaRatio">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>階梯獎金明細</h2>
+      <table class="breakdown-table" id="tierTable">
+        <thead><tr><th>階層</th><th>業績範圍</th><th>業績金額</th><th>提撥率</th><th>獎金</th></tr></thead>
+        <tbody id="tierBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>調節與扣回明細</h2>
+      <table class="breakdown-table" id="adjustTable">
+        <thead><tr><th>項目</th><th>調整前</th><th>調整</th><th>調整後</th></tr></thead>
+        <tbody id="adjustBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>財務健康檢查</h2>
+      <div id="healthCheck"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ====== 邏輯公式 Tab ====== -->
+<div id="tab-logic" style="display:none">
+<div class="card">
+<h2>一、銷售佣金制（階梯加速器）</h2>
+<table class="breakdown-table">
+  <tr><th>項目</th><th>公式</th><th>說明</th></tr>
+  <tr><td>年度目標</td><td>Quota = OTE × (4~6倍)</td><td>以 TCO（含法定成本）為基準，確保勞動分配率 ≤ 50%</td></tr>
+  <tr><td>第1階 0-80%</td><td>目標×80% × 提撥率X%</td><td>固定成本回收期，提撥率較低</td></tr>
+  <tr><td>第2階 81-100%</td><td>目標×20% × 提撥率Y%</td><td>利潤分享期，提撥率提高</td></tr>
+  <tr><td>第3階 100%+</td><td>超額 × 提撥率Z%</td><td>加速器，Z>Y，分享規模化利潤</td></tr>
+  <tr><td>毛利佣金制</td><td>(營收-COGS) × 佣金率</td><td>防止過度打折，引導高毛利銷售</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h2>二、MBO/KPI 目標管理型</h2>
+<table class="breakdown-table">
+  <tr><th>項目</th><th>公式</th><th>說明</th></tr>
+  <tr><td>綜合評分</td><td>獎金基數 × Σ(KPIᵢ×Wᵢ) × 行為係數</td><td>加權係數總和 100%，行為係數調節數字達標但不當行為</td></tr>
+  <tr><td>生產超額分享</td><td>(實際產量-基準) × 盈餘分享率</td><td>需搭配品質門檻，良率不足則扣減</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h2>三、年度綜合獎金</h2>
+<table class="breakdown-table">
+  <tr><th>項目</th><th>公式</th><th>說明</th></tr>
+  <tr><td>綜合核算</td><td>核定天數×績效係數×日薪 - 考勤積數 + 訓練積數</td><td>績效係數：優等1.2~1.5、甲等1.0、乙等0.8</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h2>四、品質調節與 Clawback</h2>
+<table class="breakdown-table">
+  <tr><th>項目</th><th>公式</th><th>說明</th></tr>
+  <tr><td>CSAT 調節</td><td>計算獎金 × CSAT 加權係數</td><td>未達門檻則打折，重大申訴一票否決</td></tr>
+  <tr><td>Clawback 追回</td><td>已發佣金×(未履行月數/總月數)</td><td>SaaS/金融/房仲，防止短期道德風險</td></tr>
+  <tr><td>勞動分配率</td><td>人事費總額 ÷ 營業毛利</td><td>理想 ≤ 50%，超過 61% 為經營警訊</td></tr>
+  <tr><td>Compa-Ratio</td><td>實際薪資 ÷ 薪資中點</td><td>< 0.8 注意人才流失風險</td></tr>
+</table>
+</div>
+</div>
+
+<script>
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-calc').style.display = name === 'calc' ? '' : 'none';
+  document.getElementById('tab-logic').style.display = name === 'logic' ? '' : 'none';
+}
+
+function n(v) { return parseFloat(v) || 0; }
+function fmt(v) { return 'NT$' + Math.round(v).toLocaleString(); }
+function fmtW(v) { return Math.round(v).toLocaleString() + ' 萬'; }
+
+function calculate() {
+  const baseSalary = n(document.getElementById('baseSalary').value);
+  const targetBonus = n(document.getElementById('targetBonus').value);
+  const overhead = n(document.getElementById('overheadRate').value) / 100;
+  const quota = n(document.getElementById('quota').value);
+  const actual = n(document.getElementById('actual').value);
+  const t1r = n(document.getElementById('tier1Rate').value) / 100;
+  const t2r = n(document.getElementById('tier2Rate').value) / 100;
+  const t3r = n(document.getElementById('tier3Rate').value) / 100;
+  const cogs = n(document.getElementById('cogsRate').value) / 100;
+  const gmRate = n(document.getElementById('grossMarginRate').value) / 100;
+  const kpiScore = n(document.getElementById('kpiScore').value);
+  const kpiWeight = n(document.getElementById('kpiWeight').value) / 100;
+  const csatTarget = n(document.getElementById('csatTarget').value);
+  const csatActual = n(document.getElementById('csatActual').value);
+  const csatPenalty = n(document.getElementById('csatPenalty').value) / 100;
+  const behaviorMod = n(document.getElementById('behaviorMod').value);
+  const cbAmt = n(document.getElementById('cbAmount').value);
+  const cbRate = n(document.getElementById('cbRate').value) / 100;
+  const cbTotal = n(document.getElementById('cbTotalMonths').value);
+  const cbFulfilled = n(document.getElementById('cbFulfilledMonths').value);
+
+  const ote = baseSalary + targetBonus;
+  const tco = ote * (1 + overhead);
+  const achieveRate = actual / quota;
+  const grossProfit = actual * (1 - cogs);
+  const gmCommission = grossProfit * gmRate;
+
+  // === 階梯佣金計算 ===
+  let tierBonus = 0;
+  const tiers = [];
+
+  const tier1Cap = quota * 0.8;
+  const tier1Amt = Math.min(Math.max(actual, 0), tier1Cap);
+  const tier1Bonus = tier1Amt * t1r;
+  tiers.push({ name: '第1階 (0-80%)', range: '0 ~ ' + fmtW(tier1Cap), amt: tier1Amt, rate: (t1r*100).toFixed(1)+'%', bonus: tier1Bonus });
+  tierBonus += tier1Bonus;
+
+  if (actual > tier1Cap) {
+    const tier2Amt = Math.min(actual - tier1Cap, quota * 0.2);
+    const tier2Bonus = tier2Amt * t2r;
+    tiers.push({ name: '第2階 (81-100%)', range: fmtW(tier1Cap) + ' ~ ' + fmtW(quota), amt: tier2Amt, rate: (t2r*100).toFixed(1)+'%', bonus: tier2Bonus });
+    tierBonus += tier2Bonus;
+  }
+
+  if (actual > quota) {
+    const tier3Amt = actual - quota;
+    const tier3Bonus = tier3Amt * t3r;
+    tiers.push({ name: '第3階 (100%+)', range: fmtW(quota) + ' 以上', amt: tier3Amt, rate: (t3r*100).toFixed(1)+'%', bonus: tier3Bonus });
+    tierBonus += tier3Bonus;
+  }
+
+  // 佣金制 vs 毛利佣金制，取較高者（實務上以帶入的 tier 為主）
+  const rawCommission = tierBonus;
+
+  // === KPI 調節 ===
+  const kpiAdjusted = rawCommission * (kpiScore * kpiWeight);
+
+  // === 行為職能係數 ===
+  const behaviorAdjusted = kpiAdjusted * behaviorMod;
+
+  // === CSAT 品質門檻 ===
+  let csatAdjusted = behaviorAdjusted;
+  let csatNote = '';
+  if (csatActual < csatTarget) {
+    const factor = 1 - csatPenalty;
+    csatAdjusted = behaviorAdjusted * factor;
+    csatNote = 'CSAT ' + csatActual.toFixed(1) + '/' + csatTarget.toFixed(1) + ' 未達標，打 ' + (factor*100).toFixed(0) + '%';
+  } else {
+    csatNote = 'CSAT ' + csatActual.toFixed(1) + '/' + csatTarget.toFixed(1) + ' 達標 ✅';
+  }
+
+  // === Clawback ===
+  let clawbackAmt = 0;
+  if (cbTotal > 0 && cbFulfilled < cbTotal) {
+    const unfulfilledRatio = (cbTotal - cbFulfilled) / cbTotal;
+    const originalComm = cbAmt * cbRate;
+    clawbackAmt = originalComm * unfulfilledRatio;
+  }
+  // 法律紅線：扣回後實領月薪不得低於 29500
+  const monthlyMinWage = 29500 * 12 / 10000; // 35.4 萬/年
+  const finalBonus = Math.max(csatAdjusted - clawbackAmt, 0);
+  const totalPay = baseSalary + finalBonus;
+  const totalPayMonthly = totalPay / 12;
+
+  // === 財務健康 ===
+  const totalPersonnelCost = tco; // 含法定成本
+  const laborRate = grossProfit > 0 ? (totalPersonnelCost / grossProfit) * 100 : 0;
+  const compaRatio = ote > 0 ? (actual / quota) : 0; // simplified: achievement vs target
+
+  // === 渲染結果 ===
+
+  document.getElementById('rAchieve').textContent = (achieveRate * 100).toFixed(1) + '%';
+  document.getElementById('rFinalBonus').textContent = fmtW(finalBonus);
+  document.getElementById('rGrossCommission').textContent = fmtW(rawCommission);
+  document.getElementById('rClawback').textContent = '-' + fmtW(clawbackAmt);
+  document.getElementById('rTotalPay').textContent = fmtW(totalPay);
+  document.getElementById('rLaborRate').textContent = laborRate.toFixed(1) + '%';
+  document.getElementById('rCompaRatio').textContent = compaRatio.toFixed(2);
+
+  // 階梯明細
+  const tbody = document.getElementById('tierBody');
+  tbody.innerHTML = tiers.map(t => `<tr><td>${t.name}</td><td>${t.range}</td><td class="text-right">${fmtW(t.amt)}</td><td class="text-right">${t.rate}</td><td class="text-right">${fmtW(t.bonus)}</td></tr>`).join('');
+  tbody.innerHTML += `<tr class="total-row"><td colspan="4" class="text-right">佣金合計</td><td class="text-right">${fmtW(rawCommission)}</td></tr>`;
+
+  // 調節明細
+  const abody = document.getElementById('adjustBody');
+  let rows = [];
+  rows.push(['原始佣金', fmtW(rawCommission), '—', fmtW(rawCommission)]);
+  rows.push(['KPI 調節 (得分×權重)', fmtW(rawCommission), (kpiScore * kpiWeight * 100).toFixed(0) + '%', fmtW(kpiAdjusted)]);
+  if (behaviorMod !== 1.0) {
+    rows.push(['行為職能係數', fmtW(kpiAdjusted), '×' + behaviorMod.toFixed(2), fmtW(behaviorAdjusted)]);
+  }
+  rows.push(['CSAT 品質門檻', fmtW(behaviorAdjusted), csatNote, fmtW(csatAdjusted)]);
+  if (clawbackAmt > 0) {
+    rows.push(['Clawback 追回', fmtW(csatAdjusted), '-' + fmtW(clawbackAmt), fmtW(csatAdjusted - clawbackAmt)]);
+  }
+  rows.push(['最終獎金', '', '', fmtW(finalBonus)]);
+  abody.innerHTML = rows.map((r, i) => {
+    const isLast = i === rows.length - 1;
+    const isDed = r[2].startsWith('-') || r[0] === 'Clawback 追回';
+    const cls = isLast ? 'total-row' : (isDed ? 'deduction-row' : '');
+    return `<tr class="${cls}"><td>${r[0]}</td><td class="text-right">${r[1]}</td><td class="text-right">${r[2]}</td><td class="text-right">${r[3]}</td></tr>`;
+  }).join('');
+
+  // 財務健康
+  let healthHtml = '<div class="health-meter">';
+
+  const laborOk = laborRate <= 50;
+  healthHtml += `<div class="health-item ${laborOk ? 'success-box' : 'danger-box'}">
+    <div class="val">${laborRate.toFixed(1)}%</div>
+    <div>勞動分配率 ${laborOk ? '✅ 健康 (≤50%)' : '⚠️ 過高 (>50%)'}</div>
+  </div>`;
+
+  const compaOk = compaRatio >= 0.8;
+  healthHtml += `<div class="health-item ${compaOk ? 'success-box' : 'danger-box'}">
+    <div class="val">${compaRatio.toFixed(2)}</div>
+    <div>Compa-Ratio ${compaOk ? '✅ 正常' : '⚠️ 偏低 (<0.8)'}</div>
+  </div>`;
+
+  const wageOk = totalPayMonthly * 10000 >= 29500;
+  healthHtml += `<div class="health-item ${wageOk ? 'success-box' : 'danger-box'}">
+    <div class="val">${fmt(totalPayMonthly * 10000)}/月</div>
+    <div>最低工資 ${wageOk ? '✅ 合規' : '⚠️ 低於 29,500'}</div>
+  </div>`;
+
+  const roiOk = laborRate <= 50;
+  healthHtml += `<div class="health-item ${roiOk ? 'success-box' : 'danger-box'}">
+    <div class="val">${(totalPersonnelCost > 0 ? (actual / totalPersonnelCost).toFixed(1) : 0)}x</div>
+    <div>營收/人事成本比</div>
+  </div>`;
+
+  healthHtml += '</div>';
+
+  if (laborRate > 61) {
+    healthHtml += '<div class="danger-box">🔴 勞動分配率超過 61%，經營警訊！需調整薪酬結構或提升毛利。</div>';
+  }
+  if (!wageOk) {
+    healthHtml += '<div class="danger-box">🔴 扣回後月薪低於 29,500 元（2026 基本工資），違反勞基法！Clawback 需設上限。</div>';
+  }
+
+  document.getElementById('healthCheck').innerHTML = healthHtml;
+}
+
+function loadExample() {
+  document.getElementById('jobType').value = '上山型';
+  document.getElementById('bonusType').value = 'commission';
+  document.getElementById('baseSalary').value = 120;
+  document.getElementById('targetBonus').value = 120;
+  document.getElementById('overheadRate').value = 20;
+  document.getElementById('quota').value = 1440;
+  document.getElementById('actual').value = 1800;
+  document.getElementById('tier1Rate').value = 5;
+  document.getElementById('tier2Rate').value = 10;
+  document.getElementById('tier3Rate').value = 15;
+  document.getElementById('cogsRate').value = 20;
+  document.getElementById('grossMarginRate').value = 15;
+  document.getElementById('kpiScore').value = 0.95;
+  document.getElementById('kpiWeight').value = 100;
+  document.getElementById('csatTarget').value = 4.5;
+  document.getElementById('csatActual').value = 4.2;
+  document.getElementById('csatPenalty').value = 10;
+  document.getElementById('behaviorMod').value = 1.0;
+  document.getElementById('cbAmount').value = 120;
+  document.getElementById('cbRate').value = 10;
+  document.getElementById('cbTotalMonths').value = 12;
+  document.getElementById('cbFulfilledMonths').value = 4;
+  calculate();
+}
+
+// 初始載入範例
+loadExample();
+</script>
+</body>
+</html>
