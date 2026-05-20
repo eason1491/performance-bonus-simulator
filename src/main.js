@@ -60,7 +60,7 @@ function updateDepts() {
   const depts = selectedIndustry ? INDUSTRIES[selectedIndustry] : ALL_DEPTS;
 
   if (!selectedIndustry) {
-    container.innerHTML = `<div class="empty">← 請先選擇產業</div>`;
+    container.innerHTML = `<div class="empty">請先選擇產業類別</div>`;
     updateSummary();
     return;
   }
@@ -82,34 +82,37 @@ function updateDepts() {
     const fr = cfg ? cfg.fixedRatio : r.fixed;
     const br = cfg ? cfg.behaviorRatio : r.behavior;
     const pr = cfg ? cfg.performanceRatio : r.performance;
+    const floatAmt = bc + pc;
     return `<div class="d-card ${checked ? 'on' : 'off'}" id="card-${d}">
       <div class="d-head" onclick="window.toggleDept('${d}')">
         <input type="checkbox" ${checked ? 'checked' : ''} onclick="event.stopPropagation();window.toggleDept('${d}')">
         <span class="d-name">${d}</span>
         <span class="d-type ${tClass}">${type}</span>
-        <span class="d-desc">${r.desc}｜${ONE_LINERS[d]}</span>
       </div>
       <div class="d-body ${checked ? '' : 'hidden'}">
-        <div class="d-top">
-          <div class="d-total"><label>年薪總包</label><input type="number" value="${ac}" min="200000" max="5000000" step="10000" oninput="window.updCfg('${d}','total',this.value)"></div>
-          <div class="d-pct"><label>固定 %</label><input type="number" value="${fr}" min="0" max="100" oninput="window.updCfg('${d}','fixedPct',this.value)"></div>
-          <div class="d-pct"><label>行為(考核) %</label><input type="number" value="${br}" min="0" max="100" oninput="window.updCfg('${d}','behavePct',this.value)"></div>
-          <div class="d-pct"><label>績效 %</label><input type="number" value="${pr}" min="0" max="100" oninput="window.updCfg('${d}','perfPct',this.value)"></div>
+        <div class="d-controls">
+          <div class="d-ctl"><label>年薪總包</label><input type="number" value="${ac}" min="200000" max="5000000" step="10000" oninput="window.updCfg('${d}','total',this.value)"></div>
+          <div class="d-ctl"><label>固定 %</label><input type="number" value="${fr}" min="0" max="100" oninput="window.updCfg('${d}','fixedPct',this.value)"></div>
+          <div class="d-ctl"><label>行為(考核) %</label><input type="number" value="${br}" min="0" max="100" oninput="window.updCfg('${d}','behavePct',this.value)"></div>
+          <div class="d-ctl"><label>績效 %</label><input type="number" value="${pr}" min="0" max="100" oninput="window.updCfg('${d}','perfPct',this.value)"></div>
         </div>
         <div class="d-preview">
-          <div class="d-preview-row fixed">
-            <div class="d-pr-label">固定 ${fr}%</div>
-            <div class="d-pr-val">NT$ ${fc.toLocaleString()}/年</div>
-            <div class="d-pr-sub">月 ${mb.toLocaleString()}</div>
-            <div class="d-pr-items">${subj.base.join('、')}</div>
+          <div class="d-panel fixed">
+            <div class="d-panel-title">■ 固定 ${fr}%</div>
+            <div class="d-panel-amt">NT$ ${fc.toLocaleString()} <small>年</small></div>
+            <div class="d-panel-rows">
+              <div>月固定薪 <strong>NT$ ${mb.toLocaleString()}</strong></div>
+              <div class="subj">${subj.base.join('、')}</div>
+            </div>
           </div>
-          <div class="d-preview-row float">
-            <div class="d-pr-label">浮動 ${floatPct}%</div>
-            <div class="d-pr-val">NT$ ${(bc + pc).toLocaleString()}/年</div>
-            <div class="d-pr-sub"></div>
-            <div class="d-pr-items">
-              <span><strong>行為考核 ${br}%</strong> NT$ ${bc.toLocaleString()}：${subj.behavior.join('、')}</span>
-              <span><strong>績效 ${pr}%</strong> NT$ ${pc.toLocaleString()}：${subj.performance.join('、')}</span>
+          <div class="d-panel float">
+            <div class="d-panel-title">■ 浮動 ${floatPct}%</div>
+            <div class="d-panel-amt">NT$ ${floatAmt.toLocaleString()} <small>年</small></div>
+            <div class="d-panel-rows">
+              <div>行為考核 ${br}%<strong>NT$ ${bc.toLocaleString()}</strong></div>
+              <div class="subj">${subj.behavior.join('、')}</div>
+              <div style="margin-top:6px;">績效 ${pr}%<strong>NT$ ${pc.toLocaleString()}</strong></div>
+              <div class="subj">${subj.performance.join('、')}</div>
             </div>
           </div>
         </div>
