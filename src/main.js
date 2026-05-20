@@ -236,9 +236,10 @@ window.showDeptModal = function() {
     <h3 style="margin-bottom:16px;font-size:16px;font-weight:700;">管理部門</h3>
     <table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="border-bottom:2px solid #e2e8f0;"><th style="text-align:left;padding:8px;">部門名稱</th><th style="text-align:left;padding:8px;">型態</th><th style="padding:8px;"></th><th style="padding:8px;"></th><th style="padding:8px;"></th></tr></thead><tbody>${rows}</tbody></table>
     <div style="margin-top:12px;display:flex;gap:8px;"><select id="newDeptType" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:6px;">${JOB_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}</select><button class="btn-primary" onclick="window.addDept()">＋ 新增部門</button></div>
-    <div style="margin-top:16px;text-align:right;"><button class="btn-primary" onclick="window.closeModal(this);">完成</button></div>
+    <div style="margin-top:16px;text-align:right;"><button class="btn-primary btn-modal-done">完成</button></div>
   </div>`;
   document.body.appendChild(bg);
+  bg.querySelector('.btn-modal-done').onclick = function() { bg.remove(); save(); render(); };
 };
 window.renameDept = function(id, name) { const d = data.departments.find(x => x.id === id); if (d) { d.name = name || d.name; save(); } };
 window.changeDeptType = function(id, type) { const d = data.departments.find(x => x.id === id); if (d) { d.type = type; save(); } };
@@ -271,9 +272,10 @@ window.showDeptSortModal = function() {
   bg.innerHTML = `<div style="background:#fff;border-radius:12px;padding:28px;min-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.2);" onclick="event.stopPropagation()">
     <h3 style="margin-bottom:12px;font-size:16px;font-weight:700;">拖曳調整部門順序</h3>
     <div id="sortContainer">${items}</div>
-    <div style="margin-top:16px;text-align:right;"><button class="btn-primary" onclick="window.closeModal(this);">完成</button></div>
+    <div style="margin-top:16px;text-align:right;"><button class="btn-primary btn-modal-done">完成</button></div>
   </div>`;
   document.body.appendChild(bg);
+  bg.querySelector('.btn-modal-done').onclick = function() { bg.remove(); save(); render(); };
   initSortDrag();
 };
 function initSortDrag() {
@@ -431,7 +433,7 @@ window.closeModal = function(btn) {
   let el = btn;
   while (el && !(el.tagName === 'DIV' && el.style.position === 'fixed')) el = el.parentElement;
   if (el) el.remove();
-  setTimeout(() => { try { save(); render(); } catch(e) { location.reload(); } }, 30);
+  setTimeout(() => { try { window.save(); window.render(); } catch(e) { console.error(e); location.reload(); } }, 30);
 };
 
 window.toggleAlloc = function(deptId, idx) {
@@ -591,9 +593,10 @@ window.showSubjectsEditor = function(deptId) {
     <h3 style="margin-bottom:16px;font-size:16px;font-weight:700;">✏ 編輯科目 — ${d ? d.name : ''}</h3>
     <p style="font-size:12px;color:#64748b;margin-bottom:12px;">編輯科目名稱，實際金額在各職等展開列中調整。分紅/福利為外加（視公司盈餘發放）。</p>
     ${html}
-    <div style="margin-top:16px;text-align:right;"><button class="btn-primary" onclick="window.closeModal(this);">完成</button></div>
+    <div style="margin-top:16px;text-align:right;"><button class="btn-primary btn-modal-done">完成</button></div>
   </div>`;
   document.body.appendChild(bg);
+  bg.querySelector('.btn-modal-done').onclick = function() { bg.remove(); save(); render(); };
 };
 window.updSubjItem = function(deptId, cat, idx, val) {
   const cfg = data.deptConfigs[deptId];
@@ -801,9 +804,14 @@ window.showGradeMatrixEditor = function() {
     </div>
     <div style="background:#f0f9ff;padding:8px 12px;border-radius:8px;margin-bottom:16px;font-size:11px;color:#1e40af;">每個職系獨立編輯。帶寬建議：基層20-30%、中階30-40%、高階40-60%。</div>
     ${famHtml}
-    <div style="margin-top:16px;text-align:right;"><button class="btn-primary" onclick="window.closeModal(this);">完成</button></div>
+    <div style="margin-top:16px;text-align:right;"><button class="btn-primary" id="gradeEditorDone">完成</button></div>
   </div>`;
   document.body.appendChild(bg);
+  document.getElementById('gradeEditorDone').onclick = function() {
+    bg.remove();
+    save();
+    render();
+  };
 };
 
 window.updGradeTitle = function(family, grade, val) {
