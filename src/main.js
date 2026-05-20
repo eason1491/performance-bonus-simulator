@@ -1,272 +1,290 @@
-/** 薪酬結構設計平台 — 單頁儀表板 */
-
 import { signInWithGoogle, signOut, onAuthChange, getCurrentUser } from './auth.js';
 import { INDUSTRIES, DEPT_TYPE, DEPT_RATIOS, DEPT_SUBJECTS, INDUSTRY_BENCHMARKS, ONE_LINERS, createDeptConfig, ALL_DEPTS } from './data.js';
 
-let currentUser = null;
-let selectedIndustry = null;
-let selectedDepts = [];
-let deptConfigs = {};
-let budget = { monthlyRevenue: 500, laborRatio: 25, headcounts: {}, locked: false };
+let curUser = null;
+let currentStep = 1;
+let data = null;
 
-onAuthChange((event, user) => {
-  if (user) {
-    currentUser = user;
-    document.getElementById('login').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
-    document.getElementById('userName').textContent = user.user_metadata?.full_name || user.email;
-    document.getElementById('userAvatar').src = user.user_metadata?.avatar_url || '';
-    initApp();
-  } else { currentUser = null; }
-});
+const STORAGE_KEY = 'salary_v1';
 
-getCurrentUser().then(user => {
-  if (user) {
-    currentUser = user;
-    document.getElementById('login').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
-    document.getElementById('userName').textContent = user.user_metadata?.full_name || user.email;
-    document.getElementById('userAvatar').src = user.user_metadata?.avatar_url || '';
-    initApp();
-  }
-});
-
-window.signInWithGoogle = signInWithGoogle;
-window.signOut = signOut;
-
-function initApp() {
-  renderIndustries();
-  updateDepts();
+function defaultData(ind) {
+  const depts = INDUSTRIES[ind] || [];
+  const hc = {};
+  depts.forEach(d => { hc[d] = 3; });
+  const bench = INDUSTRY_BENCHMARKS[ind];
+  const range = bench ? parseRange(bench.laborRate) : { min: 20, max: 40 };
+  const mid = Math.round((range.min + range.max) / 2);
+  return {
+    industry: ind,
+    monthlyRevenue: 500,
+    laborRatio: mid,
+    headcounts: hc,
+    deptConfigs: {},
+    step: 1
+  };
 }
 
-// ── Industry Chips ──
-function renderIndustries() {
-  document.getElementById('industryChips').innerHTML =
-    Object.keys(INDUSTRIES).map(ind =>
-      `<button class="chip ${selectedIndustry === ind ? 'active' : ''}" onclick="window.pickIndustry('${ind}')">${ind}</button>`
-    ).join('');
-}
-
-window.pickIndustry = function(ind) {
-  selectedIndustry = ind;
-  renderIndustries();
-  selectedDepts = [...INDUSTRIES[ind]];
-  deptConfigs = {};
-  budget = { monthlyRevenue: 500, laborRatio: 25, headcounts: {}, locked: false };
-  renderBudgetPlanner();
-  updateDepts();
-};
-
-// ── Budget Planner ──
-function parseRatioRange(str) {
+function parseRange(str) {
   if (!str) return { min: 20, max: 40 };
   const m = str.match(/([\d.]+)\s*-\s*([\d.]+)/);
   return m ? { min: parseFloat(m[1]), max: parseFloat(m[2]) } : { min: 20, max: 40 };
 }
 
-function renderBudgetPlanner() {
-  const el = document.getElementById('budgetPlanner');
-  if (!selectedIndustry) { el.classList.add('hidden'); return; }
-  el.classList.remove('hidden');
+// Auth
+onAuthChange((e, u) => { if (u) { curUser = u; showApp(); } });
+getCurrentUser().then(u => { if (u) { curUser = u; showApp(); } });
+window.signInWithGoogle = signInWithGoogle;
+window.signOut = signOut;
 
-  const bench = INDUSTRY_BENCHMARKS[selectedIndustry];
-  const range = parseRatioRange(bench ? bench.laborRate : '20%-40%');
-  const mid = Math.round((range.min + range.max) / 2);
-  if (!budget.locked) budget.laborRatio = mid;
-
-  const depts = INDUSTRIES[selectedIndustry];
-  const annualTotal = budget.monthlyRevenue * 12 * budget.laborRatio / 100;
-  const defaultShare = Math.round(100 / depts.length);
-
-  let deptRows = depts.map((d, i) => {
-    const hc = budget.headcounts[d] !== undefined ? budget.headcounts[d] : 3;
-    return `<div class="bp-dept">
-      <span class="bp-dname">${d}</span>
-      <input type="number" value="${hc}" min="0" max="200" onchange="window.updBudgetHeadcount('${d}',this.value)">
-      <span style="font-size:12px;color:#90a4ae;">人</span>
-      <span class="bp-dbudget" id="bd-${d}"></span>
-    </div>`;
-  }).join('');
-
-  el.innerHTML = `
-    <div class="bp-title">
-      📊 預算規劃
-      <span class="toggle" onclick="document.getElementById('bpBody').classList.toggle('hidden')">收合</span>
-    </div>
-    <div id="bpBody">
-      <div class="bp-row">
-        <div class="bp-field"><label>月營業額目標（萬）</label><input type="number" id="bpRevenue" value="${budget.monthlyRevenue}" min="10" max="999999" onchange="window.updBudget('revenue',this.value)"></div>
-        <div class="bp-field"><label>人事成本比例 %（建議 ${range.min}%-${range.max}%）</label><input type="number" id="bpRatio" value="${budget.laborRatio}" min="1" max="100" step="0.5" onchange="window.updBudget('ratio',this.value)"></div>
-        <div class="bp-field" style="display:flex;align-items:flex-end;gap:8px;">
-          <button class="bp-apply" onclick="window.applyBudget()">套用至部門</button>
-          <button class="btn" onclick="window.resetBudget()">重設</button>
-        </div>
-      </div>
-      <div class="bp-total">年人事總預算 <strong id="bpTotal"></strong> <small id="bpMonthly"></small></div>
-      <div class="bp-depts" id="bpDepts">${deptRows}</div>
-      <div class="bp-hint">💡 調整各部門人數後，系統自動按比例分配預算。點「套用至部門」將預算寫入部門卡片。</div>
-    </div>`;
-  updateBudgetDisplay();
+function showApp() {
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  const meta = curUser.user_metadata || {};
+  document.getElementById('userName').textContent = meta.full_name || curUser.email;
+  document.getElementById('userAvatar').src = meta.avatar_url || '';
+  init();
 }
 
-function updateBudgetDisplay() {
-  const depts = INDUSTRIES[selectedIndustry];
-  if (!depts) return;
-  const annualTotal = budget.monthlyRevenue * 12 * budget.laborRatio / 100;
-  const totalEl = document.getElementById('bpTotal');
-  const monthEl = document.getElementById('bpMonthly');
-  if (totalEl) totalEl.textContent = `NT$ ${annualTotal.toLocaleString()} 萬`;
-  if (monthEl) monthEl.textContent = `（月均 NT$ ${(annualTotal / 12).toLocaleString()} 萬）`;
-
-  depts.forEach(d => { if (budget.headcounts[d] === undefined) budget.headcounts[d] = 3; });
-  const totalHC = depts.reduce((s, d) => s + budget.headcounts[d], 0);
-  depts.forEach(d => {
-    const hc = budget.headcounts[d];
-    const deptBudget = totalHC > 0 ? Math.round(annualTotal * hc / totalHC) : 0;
-    const bdEl = document.getElementById(`bd-${d}`);
-    if (bdEl) bdEl.textContent = hc > 0 ? `NT$${deptBudget.toLocaleString()}萬` : '—';
-  });
-}
-
-window.updBudget = function(field, val) {
-  if (field === 'revenue') budget.monthlyRevenue = parseFloat(val) || 500;
-  if (field === 'ratio') budget.laborRatio = parseFloat(val) || 25;
-  updateBudgetDisplay();
-};
-
-window.updBudgetHeadcount = function(dept, val) {
-  const n = parseInt(val);
-  budget.headcounts[dept] = !isNaN(n) && n >= 0 ? n : 1;
-  updateBudgetDisplay();
-};
-
-window.resetBudget = function() {
-  budget = { monthlyRevenue: 500, laborRatio: 25, headcounts: {}, locked: false };
-  deptConfigs = {};
-  renderBudgetPlanner();
-  updateDepts();
-};
-
-window.applyBudget = function() {
-  const depts = INDUSTRIES[selectedIndustry];
-  const annualTotal = budget.monthlyRevenue * 12 * budget.laborRatio / 100;
-  const totalHC = depts.reduce((s, d) => s + (budget.headcounts[d] || 0), 0);
-
-  depts.forEach(d => {
-    const hc = budget.headcounts[d] || 0;
-    if (hc === 0) { delete deptConfigs[d]; return; }
-    const deptBudget = totalHC > 0 ? Math.round(annualTotal * hc / totalHC) : 0;
-    const perPerson = Math.round(deptBudget / hc);
-    deptConfigs[d] = createDeptConfig(d, perPerson * 10000);
-    if (!selectedDepts.includes(d)) selectedDepts.push(d);
-  });
-  budget.locked = true;
-  renderBudgetPlanner();
-  updateDepts();
-};
-
-// ── Department Cards ──
-function updateDepts() {
-  const container = document.getElementById('deptCards');
-  const depts = selectedIndustry ? INDUSTRIES[selectedIndustry] : ALL_DEPTS;
-
-  if (!selectedIndustry) {
-    container.innerHTML = `<div class="empty">請先選擇產業類別</div>`;
-    updateSummary();
-    return;
+function init() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try {
+      data = JSON.parse(saved);
+      if (data && data.industry && INDUSTRIES[data.industry]) {
+        renderIndustries();
+        currentStep = data.step || 1;
+        render();
+        return;
+      }
+    } catch(e) {}
   }
+  renderIndustries();
+}
 
-  container.innerHTML = depts.map(d => {
+// Industry chips
+function renderIndustries() {
+  document.getElementById('industryChips').innerHTML =
+    Object.keys(INDUSTRIES).map(ind =>
+      `<button class="chip ${data && data.industry === ind ? 'active' : ''}" onclick="window.pickInd('${ind}')">${ind}</button>`
+    ).join('');
+}
+
+window.pickInd = function(ind) {
+  data = defaultData(ind);
+  currentStep = 1;
+  renderIndustries();
+  save();
+  render();
+};
+
+// ── Render ──
+function render() {
+  if (!data) { document.getElementById('stepContent').innerHTML = '<div class="empty">請先選擇產業類別</div>'; renderSidebar(); return; }
+  renderSteps();
+  renderStepContent();
+  renderSidebar();
+}
+
+function getAnnualTotal() {
+  return data.monthlyRevenue * 12 * data.laborRatio / 100;
+}
+
+function getTotalHC() {
+  const depts = INDUSTRIES[data.industry];
+  return depts.reduce((s, d) => s + (data.headcounts[d] || 0), 0);
+}
+
+function getDeptBudget(d) {
+  const totalHC = getTotalHC();
+  const hc = data.headcounts[d] || 0;
+  return totalHC > 0 ? Math.round(getAnnualTotal() * hc / totalHC) : 0;
+}
+
+function getPerPerson(d) {
+  const hc = data.headcounts[d] || 0;
+  const db = getDeptBudget(d);
+  return hc > 0 ? Math.round(db / hc) : 0;
+}
+
+function save() {
+  if (data) { data.step = currentStep; localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+}
+
+// ── Step Indicator ──
+function renderSteps() {
+  const labels = ['設定總預算', '配置部門人數', '薪酬結構設計', '總覽報表'];
+  const states = ['pending', 'pending', 'pending', 'pending'];
+  for (let i = 0; i < currentStep; i++) states[i] = 'done';
+  states[currentStep - 1] = 'active';
+  document.getElementById('stepIndicator').innerHTML = states.map((s, i) => {
+    const n = i + 1;
+    const icons = ['❶', '❷', '❸', '❹'];
+    return `${i > 0 ? '<span class="step-arrow">›</span>' : ''}<div class="step ${s}" onclick="window.goStep(${n})" style="cursor:pointer;"><div class="step-num">${icons[i]}</div><div class="step-label">${labels[i]}</div></div>`;
+  }).join('');
+}
+
+window.goStep = function(n) {
+  if (n < 1 || n > 4) return;
+  if (n > currentStep + 1) return;
+  currentStep = n;
+  save();
+  render();
+};
+
+// ── Step Content ──
+function renderStepContent() {
+  const el = document.getElementById('stepContent');
+  if (currentStep === 1) el.innerHTML = step1HTML();
+  else if (currentStep === 2) el.innerHTML = step2HTML();
+  else if (currentStep === 3) el.innerHTML = step3HTML();
+  else if (currentStep === 4) el.innerHTML = step4HTML();
+}
+
+function stepNav(nextLabel, allowNext) {
+  return `<div class="step-nav">
+    <button class="btn" onclick="window.goStep(${currentStep - 1})" ${currentStep <= 1 ? 'disabled' : ''}>‹ 上一步</button>
+    <button class="btn-primary" onclick="window.goStep(${currentStep + 1})" ${!allowNext ? 'disabled' : ''}>${nextLabel} ›</button>
+  </div>`;
+}
+
+// ── Step 1: Budget ──
+function step1HTML() {
+  const bench = INDUSTRY_BENCHMARKS[data.industry];
+  const range = bench ? parseRange(bench.laborRate) : { min: 20, max: 40 };
+  const at = getAnnualTotal();
+  return `<div class="scard">
+    <div class="scard-title">❶ 設定總預算</div>
+    <div class="scard-desc">填入月營業額，選擇人事成本比例，系統自動計算年人事總預算。</div>
+    <div class="b1-grid">
+      <div class="b1-field"><label>月營業額目標（萬）</label><input type="number" id="s1rev" value="${data.monthlyRevenue}" min="10" max="999999" onchange="window.updS1('rev',this.value)"></div>
+      <div class="b1-field"><label>人事成本比例 %（${data.industry} 建議 ${bench ? bench.laborRate : '20%-40%'}）</label><input type="number" id="s1ratio" value="${data.laborRatio}" min="1" max="100" step="0.5" onchange="window.updS1('ratio',this.value)"></div>
+    </div>
+    <div class="b1-total">年人事總預算 <strong>NT$ ${at.toLocaleString()} 萬</strong> <small>（月均 NT$ ${(at/12).toLocaleString()} 萬）</small></div>
+    <div class="b1-suggest">${bench ? `💡 ${data.industry} 業界參考：人事成本 ${bench.laborRate}，毛利率 ${bench.grossMargin}` : ''}</div>
+  </div>${stepNav('下一步：配置部門 ›', data.industry && data.laborRatio > 0)}`;
+}
+
+window.updS1 = function(field, val) {
+  if (field === 'rev') data.monthlyRevenue = parseFloat(val) || 500;
+  if (field === 'ratio') data.laborRatio = parseFloat(val) || 25;
+  currentStep = 1;
+  save();
+  renderStepContent();
+  renderSidebar();
+};
+
+// ── Step 2: Allocation ──
+function step2HTML() {
+  const depts = INDUSTRIES[data.industry];
+  const at = getAnnualTotal();
+  const totalHC = getTotalHC();
+  let rows = depts.map(d => {
+    const hc = data.headcounts[d] || 0;
+    const db = getDeptBudget(d);
+    const pct = at > 0 ? Math.round(db / at * 100) : 0;
+    return `<tr>
+      <td><strong>${d}</strong> <span class="d-type ${DEPT_TYPE[d]==='上山型'?'up':DEPT_TYPE[d]==='平路型'?'flat':'down'}" style="font-size:10px;padding:2px 6px;border-radius:4px;">${DEPT_TYPE[d]}</span></td>
+      <td><input type="number" value="${hc}" min="0" max="500" onchange="window.updS2HC('${d}',this.value)"></td>
+      <td class="r">${hc > 0 ? `NT$ ${db.toLocaleString()} 萬` : '—'}</td>
+      <td class="r">${hc > 0 ? `${pct}%` : '—'}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="scard">
+    <div class="scard-title">❷ 配置部門人數</div>
+    <div class="scard-desc">填入各部門人數，預算按人數比例自動分配（總 ${totalHC} 人）。人數為 0 則不分配預算。</div>
+    <table class="b2-table"><thead><tr><th>部門</th><th>人數</th><th class="r">部門年預算</th><th class="r">佔比</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr class="b2-total"><td><strong>合計</strong></td><td><strong>${totalHC}</strong></td><td class="r"><strong>NT$ ${at.toLocaleString()} 萬</strong></td><td class="r"><strong>100%</strong></td></tr></tfoot>
+    </table>
+  </div>${stepNav('下一步：薪酬結構 ›', totalHC > 0)}`;
+}
+
+window.updS2HC = function(dept, val) {
+  const n = parseInt(val);
+  data.headcounts[dept] = !isNaN(n) && n >= 0 ? n : 0;
+  save();
+  renderStepContent();
+  renderSidebar();
+};
+
+// ── Step 3: Structure ──
+function step3HTML() {
+  const depts = INDUSTRIES[data.industry];
+  let cards = depts.map(d => {
+    const hc = data.headcounts[d] || 0;
+    if (hc === 0) return '';
+    const db = getDeptBudget(d);
+    const pp = getPerPerson(d) * 10000;
     const type = DEPT_TYPE[d];
     const tClass = type === '上山型' ? 'up' : type === '平路型' ? 'flat' : 'down';
-    const checked = selectedDepts.includes(d);
     const r = DEPT_RATIOS[d];
-    const cfg = deptConfigs[d];
-    const ac = cfg ? cfg.annualTotal : 600000;
-    const fc = cfg ? cfg.fixedAnnual : Math.round(600000 * r.fixed / 100);
-    const mb = cfg ? cfg.monthlyBase : Math.round(fc / 12);
-    const bc = cfg ? cfg.behaviorAnnual : Math.round(600000 * r.behavior / 100);
-    const pc = cfg ? cfg.perfAnnual : Math.round(600000 * r.performance / 100);
-
-    const subj = DEPT_SUBJECTS[d];
-    const floatPct = (cfg || r).behaviorRatio + (cfg || r).performanceRatio;
+    const cfg = data.deptConfigs[d];
+    const ac = cfg ? cfg.annualTotal : pp;
     const fr = cfg ? cfg.fixedRatio : r.fixed;
     const br = cfg ? cfg.behaviorRatio : r.behavior;
     const pr = cfg ? cfg.performanceRatio : r.performance;
-    const floatAmt = bc + pc;
-    return `<div class="d-card ${checked ? 'on' : 'off'}" id="card-${d}">
-      <div class="d-head" onclick="window.toggleDept('${d}')">
-        <input type="checkbox" ${checked ? 'checked' : ''} onclick="event.stopPropagation();window.toggleDept('${d}')">
-        <span class="d-name">${d}</span>
-        <span class="d-type ${tClass}">${type}</span>
+    const fc = Math.round(ac * fr / 100);
+    const bc = Math.round(ac * br / 100);
+    const pc = Math.round(ac * pr / 100);
+    const mb = Math.round(fc / 12);
+    const subj = DEPT_SUBJECTS[d];
+    if (!data.deptConfigs[d]) {
+      data.deptConfigs[d] = createDeptConfig(d, pp);
+      if (!data.deptConfigs[d]) data.deptConfigs[d] = { annualTotal: pp, fixedRatio: r.fixed, behaviorRatio: r.behavior, performanceRatio: r.performance, fixedAnnual: fc, behaviorAnnual: bc, perfAnnual: pc, monthlyBase: mb };
+    }
+    return `<div class="str-card">
+      <div class="str-head">
+        <span class="s-name">${d}</span>
+        <span class="d-type ${tClass}" style="font-size:11px;padding:3px 8px;border-radius:4px;">${type}</span>
+        <span class="s-hc">${hc}人</span>
+        <span class="s-budget">部門 NT$ ${db.toLocaleString()} 萬／每人 NT$ ${(ac/10000).toLocaleString()} 萬</span>
       </div>
-      <div class="d-body ${checked ? '' : 'hidden'}">
-        <div class="d-controls">
-          <div class="d-ctl"><label>年薪總包</label><input type="number" value="${ac}" min="200000" max="5000000" step="10000" onchange="window.updCfg('${d}','total',this.value)"></div>
-          <div class="d-ctl"><label>固定 %</label><input type="number" value="${fr}" min="0" max="100" onchange="window.updCfg('${d}','fixedPct',this.value)"></div>
-          <div class="d-ctl"><label>行為(考核) %</label><input type="number" value="${br}" min="0" max="100" onchange="window.updCfg('${d}','behavePct',this.value)"></div>
-          <div class="d-ctl"><label>績效 %</label><input type="number" value="${pr}" min="0" max="100" onchange="window.updCfg('${d}','perfPct',this.value)"></div>
+      <div class="str-body">
+        <div class="str-ctl">
+          <div class="str-ctl-item"><label>年薪總包</label><input type="number" value="${ac}" min="200000" max="5000000" step="10000" onchange="window.updS3('${d}','total',this.value)"></div>
+          <div class="str-ctl-item"><label>固定 %</label><input type="number" value="${fr}" min="0" max="100" onchange="window.updS3('${d}','fixedPct',this.value)"></div>
+          <div class="str-ctl-item"><label>行為(考核) %</label><input type="number" value="${br}" min="0" max="100" onchange="window.updS3('${d}','behavePct',this.value)"></div>
+          <div class="str-ctl-item"><label>績效 %</label><input type="number" value="${pr}" min="0" max="100" onchange="window.updS3('${d}','perfPct',this.value)"></div>
         </div>
-        <div class="d-preview">
-          <div class="d-panel fixed">
-            <div class="d-panel-title">■ 固定 ${fr}%</div>
-            <div class="d-panel-amt">NT$ ${fc.toLocaleString()} <small>年</small></div>
-            <div class="d-panel-rows">
-              <div>月固定薪 <strong>NT$ ${mb.toLocaleString()}</strong></div>
-              <div class="subj">${subj.base.join('、')}</div>
-            </div>
+        <div class="str-prev">
+          <div class="str-panel fixed">
+            <div class="str-plabel">■ 固定 ${fr}%</div>
+            <div class="str-pamt">NT$ ${fc.toLocaleString()} <small>年</small></div>
+            <div class="str-pitems">月固定 NT$ ${mb.toLocaleString()}<span class="subj">${subj.base.join('、')}</span></div>
           </div>
-          <div class="d-panel float">
-            <div class="d-panel-title">■ 浮動 ${floatPct}%</div>
-            <div class="d-panel-amt">NT$ ${floatAmt.toLocaleString()} <small>年</small></div>
-            <div class="d-panel-rows">
-              <div>行為考核 ${br}%<strong>NT$ ${bc.toLocaleString()}</strong></div>
-              <div class="subj">${subj.behavior.join('、')}</div>
-              <div style="margin-top:6px;">績效 ${pr}%<strong>NT$ ${pc.toLocaleString()}</strong></div>
-              <div class="subj">${subj.performance.join('、')}</div>
-            </div>
+          <div class="str-panel float">
+            <div class="str-plabel">■ 浮動 ${br+pr}%</div>
+            <div class="str-pamt">NT$ ${(bc+pc).toLocaleString()} <small>年</small></div>
+            <div class="str-pitems">行為 ${br}% NT$ ${bc.toLocaleString()}<span class="subj">${subj.behavior.join('、')}</span>
+              績效 ${pr}% NT$ ${pc.toLocaleString()}<span class="subj">${subj.performance.join('、')}</span></div>
           </div>
         </div>
-        <div class="d-extra">
-          <div class="d-extra-item bonus">公司分紅（外加）：${subj.bonus.join('、')}</div>
-          <div class="d-extra-item welfare">其他福利（外加）：${subj.welfare.join('、')}</div>
-          <div class="d-extra-item risk">風險條件：${subj.risks.join('、')}</div>
+        <div class="str-extra">
+          <div class="str-extra-item bonus">分紅：${subj.bonus.join('、')}</div>
+          <div class="str-extra-item welfare">福利：${subj.welfare.join('、')}</div>
+          <div class="str-extra-item risk">風險：${subj.risks.join('、')}</div>
         </div>
       </div>
     </div>`;
   }).join('');
-  updateSummary();
+  return `<div class="scard">
+    <div class="scard-title">❸ 薪酬結構設計</div>
+    <div class="scard-desc">調整各部門固定／行為考核／績效比例，金額即時連動。每人年薪 = 部門預算 ÷ 人數。</div>
+    ${cards || '<div class="empty">尚無部門可配置</div>'}
+  </div>${stepNav('下一步：總覽報表 ›', true)}`;
 }
 
-window.toggleDept = function(d) {
-  const idx = selectedDepts.indexOf(d);
-  if (idx >= 0) {
-    selectedDepts.splice(idx, 1);
-    delete deptConfigs[d];
-  } else {
-    selectedDepts.push(d);
-    if (!deptConfigs[d]) deptConfigs[d] = createDeptConfig(d, 600000);
-  }
-  updateDepts();
-};
-
-window.updCfg = function(d, field, value) {
-  if (!deptConfigs[d]) deptConfigs[d] = createDeptConfig(d, 600000);
-  const cfg = deptConfigs[d];
-  const v = parseInt(value) || 0;
-  if (field === 'total') {
-    cfg.annualTotal = v || 600000;
-  } else if (field === 'fixedPct') {
+window.updS3 = function(d, field, val) {
+  const cfg = data.deptConfigs[d];
+  if (!cfg) return;
+  const v = parseInt(val) || 0;
+  if (field === 'total') cfg.annualTotal = v || 600000;
+  else if (field === 'fixedPct') {
     cfg.fixedRatio = Math.min(100, Math.max(0, v));
     const remain = 100 - cfg.fixedRatio;
-    const totalFloat = cfg.behaviorRatio + cfg.performanceRatio;
-    if (totalFloat > 0) {
-      cfg.behaviorRatio = Math.round(remain * cfg.behaviorRatio / totalFloat);
-      cfg.performanceRatio = remain - cfg.behaviorRatio;
-    } else {
-      cfg.behaviorRatio = Math.round(remain * 0.5);
-      cfg.performanceRatio = remain - cfg.behaviorRatio;
-    }
+    const tf = cfg.behaviorRatio + cfg.performanceRatio;
+    if (tf > 0) { cfg.behaviorRatio = Math.round(remain * cfg.behaviorRatio / tf); cfg.performanceRatio = remain - cfg.behaviorRatio; }
+    else { cfg.behaviorRatio = Math.round(remain * 0.5); cfg.performanceRatio = remain - cfg.behaviorRatio; }
   } else if (field === 'behavePct') {
     cfg.behaviorRatio = Math.min(100 - cfg.fixedRatio, Math.max(0, v));
     cfg.performanceRatio = 100 - cfg.fixedRatio - cfg.behaviorRatio;
@@ -278,83 +296,122 @@ window.updCfg = function(d, field, value) {
   cfg.behaviorAnnual = Math.round(cfg.annualTotal * cfg.behaviorRatio / 100);
   cfg.perfAnnual = Math.round(cfg.annualTotal * cfg.performanceRatio / 100);
   cfg.monthlyBase = Math.round(cfg.fixedAnnual / 12);
-  updateDepts();
+  save();
+  renderStepContent();
+  renderSidebar();
 };
 
-// ── Summary ──
-function updateSummary() {
-  const container = document.getElementById('summaryContent');
-  const active = selectedDepts.filter(d => deptConfigs[d]);
-  if (active.length === 0) {
-    container.innerHTML = '<div class="empty">勾選部門後這裡會顯示彙總</div>';
-    document.getElementById('benchmark').innerHTML = '';
-    return;
-  }
+// ── Step 4: Report ──
+function step4HTML() {
+  const depts = INDUSTRIES[data.industry];
+  const active = depts.filter(d => data.deptConfigs[d] && (data.headcounts[d] || 0) > 0);
+  if (active.length === 0) return `<div class="scard"><div class="scard-title">❹ 總覽報表</div><div class="empty">尚無資料</div></div>`;
 
-  let totalF = 0, totalB = 0, totalP = 0;
+  let totalF = 0, totalB = 0, totalP = 0, totalDept = 0;
   let rows = active.map(d => {
-    const cfg = deptConfigs[d];
+    const cfg = data.deptConfigs[d];
+    const hc = data.headcounts[d] || 0;
     const type = DEPT_TYPE[d];
     const tc = type === '上山型' ? 'up' : type === '平路型' ? 'flat' : 'down';
-    totalF += cfg.fixedAnnual;
-    totalB += cfg.behaviorAnnual;
-    totalP += cfg.perfAnnual;
-    const floatPct = cfg.behaviorRatio + cfg.performanceRatio;
-    return `<tr class="t-${tc}"><td><strong>${d}</strong></td><td><span class="d-type ${tc}" style="font-size:10px;">${type}</span></td>
-      <td class="r">NT$ ${cfg.monthlyBase.toLocaleString()}</td>
-      <td class="r">NT$ ${cfg.fixedAnnual.toLocaleString()}</td>
-      <td class="r">NT$ ${cfg.behaviorAnnual.toLocaleString()}</td>
-      <td class="r">NT$ ${cfg.perfAnnual.toLocaleString()}</td>
-      <td class="r"><strong>NT$ ${cfg.annualTotal.toLocaleString()}</strong></td>
-      <td class="r">${cfg.fixedRatio}:${floatPct}</td></tr>`;
+    const deptTotal = (cfg.fixedAnnual + cfg.behaviorAnnual + cfg.perfAnnual) * hc;
+    const deptF = cfg.fixedAnnual * hc;
+    const deptB = cfg.behaviorAnnual * hc;
+    const deptP = cfg.perfAnnual * hc;
+    totalF += deptF; totalB += deptB; totalP += deptP; totalDept += deptTotal;
+    return `<tr class="t-${tc}"><td><strong>${d}</strong></td><td>${hc}</td><td class="r">NT$ ${cfg.monthlyBase.toLocaleString()}</td><td class="r">NT$ ${cfg.fixedAnnual.toLocaleString()}</td><td class="r">NT$ ${cfg.behaviorAnnual.toLocaleString()}</td><td class="r">NT$ ${cfg.perfAnnual.toLocaleString()}</td><td class="r">NT$ ${cfg.annualTotal.toLocaleString()}</td><td class="r">NT$ ${deptTotal.toLocaleString()}</td></tr>`;
   }).join('');
 
-  const grand = totalF + totalB + totalP;
-  container.innerHTML = `<table class="stbl"><thead><tr><th>部門</th><th>型</th><th class="r">月固定</th><th class="r">年固定</th><th class="r">行為(考核)</th><th class="r">績效</th><th class="r">年薪總包</th><th class="r">固:浮</th></tr></thead>
-    <tbody>${rows}
-    <tr class="t-total"><td><strong>合計</strong></td><td></td><td class="r">NT$ ${Math.round(grand/12).toLocaleString()}</td>
-      <td class="r"><strong>NT$ ${totalF.toLocaleString()}</strong></td>
-      <td class="r"><strong>NT$ ${totalB.toLocaleString()}</strong></td>
-      <td class="r"><strong>NT$ ${totalP.toLocaleString()}</strong></td>
-      <td class="r"><strong>NT$ ${grand.toLocaleString()}</strong></td>
-      <td class="r"><strong>${Math.round(totalF/grand*100)}:${Math.round((totalB+totalP)/grand*100)}</strong></td></tr>
-    </tbody></table>`;
-
-  // Industry benchmark
-  const bench = INDUSTRY_BENCHMARKS[selectedIndustry];
-  if (bench) {
-    const range = parseRatioRange(bench.laborRate);
-    const current = budget.locked ? budget.laborRatio : null;
-    let status = '', color = '';
-    if (current !== null) {
-      if (current < range.min * 0.8) { status = '⚠️ 偏低 — 可能留不住人'; color = '#f39c12'; }
-      else if (current <= range.max) { status = '✅ 很健康'; color = '#2e7d32'; }
-      else if (current <= range.max * 1.3) { status = '⚡ 有問題 — 接近紅線'; color = '#e65100'; }
-      else { status = '🔴 有危險 — 人事成本過高'; color = '#c62828'; }
-      document.getElementById('benchmark').innerHTML =
-        `<div class="bm" style="border-left:4px solid ${color};">
-          <span>${selectedIndustry}</span> 建議 ${bench.laborRate} ｜ 目前設定 <strong>${current}%</strong> ${status}
-          <br><small>毛利率參考 ${bench.grossMargin}</small>
-        </div>`;
-    } else {
-      document.getElementById('benchmark').innerHTML =
-        `<div class="bm"><span>${selectedIndustry}</span> 建議人事成本 <strong>${bench.laborRate}</strong> ｜ 毛利率參考 <strong>${bench.grossMargin}</strong></div>`;
-    }
+  const budgetAt = getAnnualTotal() * 10000;
+  const usedPct = budgetAt > 0 ? Math.round(totalDept / budgetAt * 100) : 0;
+  const bench = INDUSTRY_BENCHMARKS[data.industry];
+  const range = bench ? parseRange(bench.laborRate) : null;
+  let health = '', healthColor = '';
+  if (range) {
+    const r = data.laborRatio;
+    if (r < range.min * 0.8) { health = '⚠️ 偏低 — 可能留不住人'; healthColor = '#f39c12'; }
+    else if (r <= range.max) { health = '✅ 很健康 — 人事成本在建議範圍內'; healthColor = '#2e7d32'; }
+    else if (r <= range.max * 1.3) { health = '⚡ 有問題 — 接近紅線'; healthColor = '#e65100'; }
+    else { health = '🔴 有危險 — 人事成本過高'; healthColor = '#c62828'; }
   }
+
+  const grand = totalF + totalB + totalP;
+  return `<div class="scard">
+    <div class="scard-title">❹ 總覽報表</div>
+    <table class="r-table"><thead><tr><th>部門</th><th>人數</th><th class="r">月固定</th><th class="r">年固定</th><th class="r">行為(考核)</th><th class="r">績效</th><th class="r">每人年薪</th><th class="r">部門總成本</th></tr></thead>
+      <tbody>${rows}
+      <tr class="t-total"><td><strong>合計</strong></td><td><strong>${getTotalHC()}</strong></td><td class="r"><strong>NT$ ${Math.round(totalF/12).toLocaleString()}</strong></td>
+        <td class="r"><strong>NT$ ${totalF.toLocaleString()}</strong></td><td class="r"><strong>NT$ ${totalB.toLocaleString()}</strong></td><td class="r"><strong>NT$ ${totalP.toLocaleString()}</strong></td>
+        <td class="r"><strong>NT$ ${Math.round(grand/getTotalHC()).toLocaleString()}</strong></td><td class="r"><strong>NT$ ${grand.toLocaleString()}</strong></td></tr>
+      </tbody></table>
+    ${health ? `<div class="r-health" style="border-left-color:${healthColor};color:${healthColor};background:${healthColor}10">${health}</div>` : ''}
+  </div>`;
+}
+
+// ── Sidebar ──
+function renderSidebar() {
+  const el = document.getElementById('sidebarOverview');
+  if (!data || !data.industry) { el.innerHTML = '<div class="sbo"><div class="sbo-title">📊 預算概覽</div><div class="empty" style="padding:20px 0;">請先選擇產業</div></div>'; return; }
+
+  const depts = INDUSTRIES[data.industry];
+  const at = getAnnualTotal();
+  const totalHC = getTotalHC();
+
+  let allocatedTotal = 0;
+  let deptLines = '';
+  depts.forEach(d => {
+    const hc = data.headcounts[d] || 0;
+    const cfg = data.deptConfigs[d];
+    const db = cfg && hc > 0 ? (cfg.fixedAnnual + cfg.behaviorAnnual + cfg.perfAnnual) * hc : 0;
+    if (hc > 0) { allocatedTotal += db; }
+    deptLines += `<div class="sbo-row"><span class="sbo-lbl">${d}</span><span class="sbo-val">${hc > 0 ? `NT$${Math.round(db/10000).toLocaleString()}萬` : '—'}</span></div>`;
+  });
+
+  const budgetAt = at * 10000;
+  const pct = budgetAt > 0 ? Math.min(100, Math.round(allocatedTotal / budgetAt * 100)) : 0;
+  const barClass = pct <= 80 ? 'good' : pct <= 100 ? 'warn' : 'danger';
+  const barLabel = pct <= 80 ? '預算餘裕' : pct <= 100 ? '預算用滿' : '超出預算';
+
+  const bench = INDUSTRY_BENCHMARKS[data.industry];
+  const range = bench ? parseRange(bench.laborRate) : null;
+  let healthBlock = '';
+  if (range && currentStep >= 1) {
+    const r = data.laborRatio;
+    let hText = '', hColor = '', hBg = '';
+    if (r < range.min * 0.8) { hText = '⚠️ 偏低'; hColor = '#f39c12'; hBg = '#fff8e1'; }
+    else if (r <= range.max) { hText = '✅ 很健康'; hColor = '#2e7d32'; hBg = '#e8f5e9'; }
+    else if (r <= range.max * 1.3) { hText = '⚡ 有問題'; hColor = '#e65100'; hBg = '#fff3e0'; }
+    else { hText = '🔴 有危險'; hColor = '#c62828'; hBg = '#ffebee'; }
+    healthBlock = `<div class="sbo-health" style="background:${hBg};color:${hColor};">${hText} — ${data.industry} 建議 ${range.min}%-${range.max}%，目前設定 ${r}%</div>`;
+  }
+
+  el.innerHTML = `<div class="sbo">
+    <div class="sbo-title">📊 預算概覽</div>
+    <div class="sbo-row"><span class="sbo-lbl">年總預算</span><span class="sbo-val">NT$ ${at.toLocaleString()} 萬</span></div>
+    <div class="sbo-row"><span class="sbo-lbl">總人數</span><span class="sbo-val">${totalHC} 人</span></div>
+    <div class="sbo-row"><span class="sbo-lbl">已分配</span><span class="sbo-val">NT$ ${Math.round(allocatedTotal/10000).toLocaleString()} 萬</span></div>
+    <div class="sbo-bar"><div class="sbo-bar-fill ${barClass}" style="width:${pct}%"></div></div>
+    <div class="sbo-bar-label">${pct}% ${barLabel}</div>
+    ${deptLines}
+    ${healthBlock}
+  </div>`;
 }
 
 // ── Export ──
 window.exportCSV = function() {
-  const active = selectedDepts.filter(d => deptConfigs[d]);
-  let csv = '\uFEFF部門,類型,月固定薪,年固定,行為獎金,績效獎金,年薪總包,固定%,浮動%\n';
+  if (!data) return;
+  const depts = INDUSTRIES[data.industry];
+  const active = depts.filter(d => data.deptConfigs[d] && (data.headcounts[d] || 0) > 0);
+  let csv = '\uFEFF部門,人數,月固定薪,年固定,行為獎金,績效獎金,每人年薪,部門總成本\n';
   active.forEach(d => {
-    const cfg = deptConfigs[d];
-    csv += `${d},${DEPT_TYPE[d]},${cfg.monthlyBase},${cfg.fixedAnnual},${cfg.behaviorAnnual},${cfg.perfAnnual},${cfg.annualTotal},${cfg.fixedRatio},${cfg.behaviorRatio + cfg.performanceRatio}\n`;
+    const cfg = data.deptConfigs[d];
+    const hc = data.headcounts[d] || 0;
+    const deptTotal = (cfg.fixedAnnual + cfg.behaviorAnnual + cfg.perfAnnual) * hc;
+    csv += `${d},${hc},${cfg.monthlyBase},${cfg.fixedAnnual},${cfg.behaviorAnnual},${cfg.perfAnnual},${cfg.annualTotal},${deptTotal}\n`;
   });
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `薪酬結構_${selectedIndustry || '未命名'}.csv`;
+  a.download = `薪酬結構_v1_${data.industry}.csv`;
   a.click();
 };
 

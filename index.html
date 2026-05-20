@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>薪酬結構設計平台</title>
+<title>薪酬結構設計平台 v1</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:#f5f6fa; color:#2c3e50; font-size:16px; }
+body { font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#f5f6fa; color:#2c3e50; font-size:15px; }
 .hidden { display:none !important; }
 
 /* Login */
@@ -17,131 +17,140 @@ body { font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI
 .btn-google { display:inline-flex; align-items:center; gap:12px; padding:14px 36px; background:#fff; border:2px solid #e0e0e0; border-radius:10px; font-size:16px; cursor:pointer; transition:.3s; }
 .btn-google:hover { border-color:#1a237e; box-shadow:0 4px 12px rgba(26,35,126,.1); }
 
+/* App Shell */
+#app { max-width:1600px; margin:0 auto; padding:0 24px; }
+
 /* Top Bar */
-.topbar { display:flex; align-items:center; justify-content:space-between; padding:18px 0; border-bottom:2px solid #e8eaf6; margin-bottom:24px; }
-.topbar h1 { font-size:22px; color:#1a237e; letter-spacing:.5px; }
-.topbar h1 small { font-size:14px; color:#90a4ae; font-weight:400; margin-left:10px; }
-.user { display:flex; align-items:center; gap:12px; font-size:14px; }
-.user img { width:36px; height:36px; border-radius:50%; border:2px solid #e8eaf6; object-fit:cover; }
-.user .logout { color:#90a4ae; cursor:pointer; font-size:13px; transition:.2s; }
-.user .logout:hover { color:#e74c3c; }
-
-.btn { padding:10px 20px; border-radius:8px; border:1px solid #cfd8dc; background:#fff; font-size:14px; cursor:pointer; transition:.2s; }
-.btn:hover { background:#eceff1; }
-
+.topbar { display:flex; align-items:center; justify-content:space-between; padding:16px 0; border-bottom:2px solid #e8eaf6; margin-bottom:20px; }
+.topbar h1 { font-size:20px; color:#1a237e; letter-spacing:.5px; }
+.topbar h1 small { font-size:13px; color:#90a4ae; font-weight:400; margin-left:8px; }
 .actions { display:flex; gap:10px; align-items:center; }
+.user { display:flex; align-items:center; gap:10px; font-size:13px; }
+.user img { width:32px; height:32px; border-radius:50%; border:2px solid #e8eaf6; }
+.user .logout { color:#90a4ae; cursor:pointer; font-size:12px; }
+.user .logout:hover { color:#e74c3c; }
+.btn { padding:8px 18px; border-radius:8px; border:1px solid #cfd8dc; background:#fff; font-size:13px; cursor:pointer; transition:.2s; }
+.btn:hover { background:#eceff1; }
+.btn-primary { padding:10px 28px; border-radius:8px; border:none; background:#1a237e; color:#fff; font-size:14px; font-weight:600; cursor:pointer; transition:.2s; }
+.btn-primary:hover { background:#283593; }
+.btn-primary:disabled { opacity:.4; cursor:default; }
 
-/* Industry Chips */
-.chip-row { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:24px; }
-.chip { padding:10px 24px; border-radius:28px; border:1px solid #cfd8dc; background:#fff; font-size:15px; cursor:pointer; transition:.2s; }
-.chip:hover { border-color:#1a237e; color:#1a237e; background:#f5f6fa; }
+/* Industry chips */
+.chip-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+.chip { padding:8px 20px; border-radius:28px; border:1px solid #cfd8dc; background:#fff; font-size:14px; cursor:pointer; transition:.2s; }
+.chip:hover { border-color:#1a237e; color:#1a237e; }
 .chip.active { background:#1a237e; color:#fff; border-color:#1a237e; }
 
-/* Budget Planner */
-.bp { background:#fff; border-radius:12px; border:1px solid #e8eaf6; margin-bottom:20px; padding:24px; }
-.bp-title { font-size:18px; font-weight:700; color:#1a237e; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
-.bp-title .toggle { font-size:12px; color:#90a4ae; cursor:pointer; margin-left:auto; }
-.bp-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:16px; }
-.bp-field label { display:block; font-size:12px; color:#90a4ae; margin-bottom:4px; font-weight:500; }
-.bp-field input { width:100%; padding:10px 12px; border:1.5px solid #e0e0e0; border-radius:8px; font-size:16px; font-weight:600; color:#1a237e; background:#fafbff; }
-.bp-field input:focus { outline:none; border-color:#1a237e; box-shadow:0 0 0 3px rgba(26,35,126,.1); }
-.bp-total { font-size:20px; font-weight:700; color:#1a237e; padding:12px 16px; background:#e8eaf6; border-radius:8px; margin-bottom:16px; }
-.bp-total small { font-size:14px; font-weight:400; color:#78909c; }
-.bp-depts { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:10px; margin-bottom:16px; }
-.bp-dept { display:flex; align-items:center; gap:8px; padding:8px 12px; background:#fafbff; border-radius:8px; border:1px solid #e8eaf6; }
-.bp-dept .bp-dname { font-weight:600; font-size:14px; min-width:70px; color:#1a237e; }
-.bp-dept input { width:60px; padding:6px 8px; border:1.5px solid #e0e0e0; border-radius:6px; font-size:14px; text-align:center; }
-.bp-dept .bp-dbudget { font-size:13px; color:#546e7a; margin-left:auto; white-space:nowrap; }
-.bp-apply { padding:10px 28px; border-radius:8px; border:none; background:#1a237e; color:#fff; font-size:15px; font-weight:600; cursor:pointer; transition:.2s; }
-.bp-apply:hover { background:#283593; }
-.bp-hint { font-size:13px; color:#90a4ae; margin-top:8px; }
+/* Step Indicator */
+.steps { display:flex; align-items:center; gap:0; margin-bottom:24px; background:#fff; border-radius:12px; padding:16px 24px; border:1px solid #e8eaf6; }
+.step { display:flex; align-items:center; gap:8px; flex:1; position:relative; }
+.step-num { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; transition:.3s; }
+.step.active .step-num { background:#1a237e; color:#fff; }
+.step.done .step-num { background:#2e7d32; color:#fff; }
+.step.pending .step-num { background:#e8eaf6; color:#90a4ae; }
+.step-label { font-size:13px; font-weight:600; transition:.3s; }
+.step.active .step-label { color:#1a237e; }
+.step.done .step-label { color:#2e7d32; }
+.step.pending .step-label { color:#b0bec5; }
+.step-arrow { color:#cfd8dc; font-size:18px; margin:0 4px; }
 
-/* Layout */
-.row { display:flex; gap:24px; }
-.col-left { width:55%; flex-shrink:0; }
-.col-right { flex:1; min-width:0; }
+/* Main Layout */
+.main { display:flex; gap:24px; min-height:calc(100vh - 200px); }
+.content { flex:1; min-width:0; }
+.sidebar { width:340px; flex-shrink:0; }
 
-/* Dept Cards — PPT style */
-.d-card { background:#fff; border-radius:12px; border:1px solid #e8eaf6; margin-bottom:12px; overflow:hidden; transition:.2s; }
-.d-card.on { border-color:#1a237e; box-shadow:0 4px 16px rgba(26,35,126,.06); }
-.d-card.off { opacity:.6; }
-.d-head { display:flex; align-items:center; gap:12px; padding:14px 20px; cursor:pointer; user-select:none; background:#fafbff; }
-.d-head input[type="checkbox"] { width:20px;height:20px;accent-color:#1a237e; }
-.d-name { font-weight:700; font-size:16px; min-width:80px; color:#1a237e; }
-.d-type { font-size:12px; padding:4px 10px; border-radius:6px; white-space:nowrap; font-weight:600; }
-.d-type.up { background:#fff3e0; color:#e65100; }
-.d-type.flat { background:#e8f5e9; color:#2e7d32; }
-.d-type.down { background:#e3f2fd; color:#1565c0; }
-.d-body { padding:20px; }
+/* Sidebar - Budget Overview */
+.sbo { background:#fff; border-radius:12px; border:1px solid #e8eaf6; padding:20px; position:sticky; top:16px; }
+.sbo-title { font-size:15px; font-weight:700; color:#1a237e; margin-bottom:12px; }
+.sbo-row { display:flex; justify-content:space-between; padding:6px 0; font-size:13px; border-bottom:1px solid #f5f6fa; }
+.sbo-row .sbo-lbl { color:#78909c; }
+.sbo-row .sbo-val { font-weight:600; color:#1a237e; }
+.sbo-bar { height:10px; background:#e8eaf6; border-radius:5px; margin:10px 0; overflow:hidden; }
+.sbo-bar-fill { height:100%; border-radius:5px; transition:width .3s; }
+.sbo-bar-fill.good { background:#2e7d32; }
+.sbo-bar-fill.warn { background:#e65100; }
+.sbo-bar-fill.danger { background:#c62828; }
+.sbo-bar-label { font-size:11px; color:#90a4ae; text-align:right; }
+.sbo-health { padding:8px 12px; border-radius:8px; font-size:13px; font-weight:600; margin-top:8px; }
 
-/* Controls row */
-.d-controls { display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:12px; margin-bottom:16px; }
-.d-ctl label { display:block; font-size:12px; color:#90a4ae; margin-bottom:4px; font-weight:500; }
-.d-ctl input { width:100%; padding:10px 12px; border:1.5px solid #e0e0e0; border-radius:8px; font-size:16px; font-weight:600; color:#1a237e; transition:.2s; background:#fafbff; }
-.d-ctl input:focus { outline:none; border-color:#1a237e; box-shadow:0 0 0 3px rgba(26,35,126,.1); }
+/* Step Content Cards */
+.scard { background:#fff; border-radius:12px; border:1px solid #e8eaf6; padding:24px; margin-bottom:16px; }
+.scard-title { font-size:17px; font-weight:700; color:#1a237e; margin-bottom:16px; }
+.scard-desc { font-size:13px; color:#78909c; margin-bottom:16px; }
 
-/* Preview — two-column PPT split */
-.d-preview { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
-.d-panel { padding:16px; border-radius:10px; min-height:100px; }
-.d-panel.fixed { background:linear-gradient(135deg, #e8eaf6 0%, #f5f6fa 100%); border:1px solid #c5cae9; }
-.d-panel.float { background:linear-gradient(135deg, #fff8e1 0%, #fffde7 100%); border:1px solid #ffe082; }
-.d-panel-title { font-size:13px; font-weight:700; color:#1a237e; margin-bottom:2px; letter-spacing:1px; }
-.d-panel-amt { font-size:22px; font-weight:700; color:#1a237e; margin-bottom:8px; }
-.d-panel-amt small { font-size:13px; font-weight:400; color:#78909c; margin-left:6px; }
-.d-panel-rows { font-size:14px; color:#546e7a; line-height:1.8; }
-.d-panel-rows > div { display:flex; justify-content:space-between; align-items:center; }
-.d-panel-rows .subj { color:#78909c; font-size:13px; display:block; line-height:1.6; margin-top:2px; }
+/* Step 1: Budget */
+.b1-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+.b1-field label { display:block; font-size:12px; color:#90a4ae; margin-bottom:4px; font-weight:500; }
+.b1-field input { width:100%; padding:10px 12px; border:1.5px solid #e0e0e0; border-radius:8px; font-size:16px; font-weight:600; color:#1a237e; background:#fafbff; }
+.b1-field input:focus { outline:none; border-color:#1a237e; box-shadow:0 0 0 3px rgba(26,35,126,.1); }
+.b1-total { font-size:22px; font-weight:700; color:#1a237e; padding:14px 18px; background:#e8eaf6; border-radius:10px; margin-bottom:8px; }
+.b1-total small { font-size:14px; font-weight:400; color:#78909c; }
+.b1-suggest { font-size:13px; color:#78909c; margin-bottom:16px; }
 
-/* Extra */
-.d-extra { display:flex; gap:8px; flex-wrap:wrap; }
-.d-extra-item { padding:8px 14px; border-radius:8px; font-size:13px; line-height:1.5; flex:1; min-width:140px; }
-.d-extra-item.bonus { background:#fff3e0; border:1px solid #ffe0b2; color:#e65100; }
-.d-extra-item.welfare { background:#e8f5e9; border:1px solid #c8e6c9; color:#2e7d32; }
-.d-extra-item.risk { background:#fce4ec; border:1px solid #f8bbd0; color:#c62828; }
+/* Step 2: Allocation */
+.b2-table { width:100%; border-collapse:collapse; font-size:14px; margin-bottom:16px; }
+.b2-table th { background:#fafbff; padding:10px 12px; text-align:left; font-weight:600; border-bottom:2px solid #e8eaf6; color:#1a237e; font-size:12px; }
+.b2-table td { padding:10px 12px; border-bottom:1px solid #e8eaf6; vertical-align:middle; }
+.b2-table td input { width:60px; padding:6px 8px; border:1.5px solid #e0e0e0; border-radius:6px; font-size:14px; text-align:center; }
+.b2-table td input:focus { outline:none; border-color:#1a237e; box-shadow:0 0 0 3px rgba(26,35,126,.1); }
+.b2-total { font-size:15px; font-weight:700; color:#1a237e; padding:10px 12px; background:#fafbff; border-top:2px solid #1a237e; }
 
-/* Summary */
-.summary { margin-top:16px; }
-.stbl { width:100%; border-collapse:collapse; font-size:14px; }
-.stbl th { background:#fafbff; padding:12px 10px; text-align:left; font-weight:600; border-bottom:2px solid #e8eaf6; color:#1a237e; font-size:13px; }
-.stbl td { padding:10px; border-bottom:1px solid #e8eaf6; }
-.stbl tbody tr:hover td { background:#fafbff; }
-.stbl .r { text-align:right; }
-.stbl .t-up td { background:#fffdf5; border-left:3px solid #e65100; }
-.stbl .t-flat td { border-left:3px solid #2e7d32; }
-.stbl .t-down td { border-left:3px solid #1565c0; }
-.stbl .t-total td { font-weight:700; border-top:2px solid #1a237e; background:#fafbff; color:#1a237e; font-size:15px; }
+/* Step 3: Structure */
+.str-card { background:#fff; border:1px solid #e8eaf6; border-radius:10px; margin-bottom:12px; overflow:hidden; }
+.str-head { display:flex; align-items:center; gap:12px; padding:12px 16px; background:#fafbff; cursor:pointer; user-select:none; font-size:14px; }
+.str-head .s-name { font-weight:700; color:#1a237e; min-width:70px; }
+.str-head .s-hc { color:#78909c; font-size:12px; }
+.str-head .s-budget { margin-left:auto; font-weight:600; color:#1a237e; font-size:14px; }
+.str-body { padding:16px; border-top:1px solid #e8eaf6; }
+.str-ctl { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; margin-bottom:12px; }
+.str-ctl-item label { font-size:11px; color:#90a4ae; display:block; margin-bottom:3px; }
+.str-ctl-item input { width:100%; padding:8px 10px; border:1.5px solid #e0e0e0; border-radius:6px; font-size:14px; font-weight:600; color:#1a237e; background:#fafbff; }
+.str-ctl-item input:focus { outline:none; border-color:#1a237e; box-shadow:0 0 0 3px rgba(26,35,126,.1); }
+.str-prev { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.str-panel { padding:12px; border-radius:8px; }
+.str-panel.fixed { background:linear-gradient(135deg,#e8eaf6,#f5f6fa); border:1px solid #c5cae9; }
+.str-panel.float { background:linear-gradient(135deg,#fff8e1,#fffde7); border:1px solid #ffe082; }
+.str-plabel { font-size:12px; font-weight:700; color:#1a237e; letter-spacing:.5px; margin-bottom:2px; }
+.str-pamt { font-size:18px; font-weight:700; color:#1a237e; margin-bottom:4px; }
+.str-pamt small { font-size:12px; font-weight:400; color:#78909c; }
+.str-pitems { font-size:13px; color:#546e7a; line-height:1.6; }
+.str-pitems .subj { color:#90a4ae; font-size:12px; display:block; }
+.str-extra { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+.str-extra-item { padding:6px 10px; border-radius:6px; font-size:12px; flex:1; min-width:120px; }
+.str-extra-item.bonus { background:#fff3e0; border:1px solid #ffe0b2; color:#e65100; }
+.str-extra-item.welfare { background:#e8f5e9; border:1px solid #c8e6c9; color:#2e7d32; }
+.str-extra-item.risk { background:#fce4ec; border:1px solid #f8bbd0; color:#c62828; }
 
-.bm { background:#e8eaf6; border-radius:8px; padding:12px 16px; font-size:14px; color:#1a237e; margin-top:12px; border-left:4px solid #1a237e; }
-.empty { text-align:center; color:#b0bec5; padding:60px 0; font-size:16px; }
+/* Step 4: Report */
+.r-table { width:100%; border-collapse:collapse; font-size:14px; }
+.r-table th { background:#fafbff; padding:12px 10px; text-align:left; font-weight:600; border-bottom:2px solid #e8eaf6; color:#1a237e; font-size:12px; }
+.r-table td { padding:10px; border-bottom:1px solid #e8eaf6; }
+.r-table .r { text-align:right; }
+.r-table .t-up td { background:#fffdf5; border-left:3px solid #e65100; }
+.r-table .t-flat td { border-left:3px solid #2e7d32; }
+.r-table .t-down td { border-left:3px solid #1565c0; }
+.r-table .t-total td { font-weight:700; border-top:2px solid #1a237e; background:#fafbff; color:#1a237e; font-size:15px; }
+.r-health { padding:12px 16px; border-radius:8px; font-size:14px; font-weight:600; margin-top:12px; border-left:4px solid; }
 
-/* Scroll */
-.left-scroll { max-height:calc(100vh - 160px); overflow-y:auto; padding-right:8px; }
-.left-scroll::-webkit-scrollbar { width:6px; }
-.left-scroll::-webkit-scrollbar-track { background:transparent; }
-.left-scroll::-webkit-scrollbar-thumb { background:#cfd8dc; border-radius:3px; }
+/* Step nav */
+.step-nav { display:flex; justify-content:space-between; margin-top:20px; padding-top:16px; border-top:1px solid #e8eaf6; }
+
+/* Empty */
+.empty { text-align:center; color:#b0bec5; padding:40px 0; font-size:15px; }
+
+/* Print */
+@media print { .sidebar,.steps,.chip-row,.step-nav,.actions,.user .logout { display:none!important; } body { background:#fff; } #app { max-width:100%; padding:0; } }
 
 /* Responsive */
-@media (max-width:1100px) {
-  .row { flex-direction:column; }
-  .col-left { width:100%; }
-  .left-scroll { max-height:none; }
-}
-
-@media print {
-  .topbar .actions, .chip-row, .d-head input, .btn, .user .logout { display:none !important; }
-  .d-card { break-inside:avoid; border:1px solid #ddd; }
-  body { background:#fff; }
-  #app { max-width:100%; padding:0; }
-}
+@media (max-width:1100px) { .main { flex-direction:column; } .sidebar { width:100%; } }
 </style>
 </head>
 <body>
 
-<!-- Login -->
 <div id="login">
   <div class="login-box">
     <h1>薪酬結構設計平台</h1>
-    <p>11 部門 × 三種職務形狀 · 科目拆解 · 產業對照</p>
+    <p>v1 · 流程引導 · 總預算→部門→結構</p>
     <button class="btn-google" onclick="window.signInWithGoogle()">
       <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
       使用 Google 登入
@@ -149,10 +158,9 @@ body { font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI
   </div>
 </div>
 
-<!-- App -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <h1>薪酬結構設計平台 <small>11 部門 × 三種職務形狀</small></h1>
+    <h1>薪酬結構設計平台 <small>v1 · 總預算 → 部門配置 → 結構設計</small></h1>
     <div class="actions">
       <button class="btn" onclick="window.exportCSV()">📥 CSV</button>
       <button class="btn" onclick="window.exportPDF()">🖨️ PDF</button>
@@ -166,15 +174,14 @@ body { font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI
 
   <div class="chip-row" id="industryChips"></div>
 
-  <div id="budgetPlanner" class="bp hidden"></div>
+  <!-- Step Indicator -->
+  <div class="steps" id="stepIndicator"></div>
 
-  <div class="row">
-    <div class="col-left">
-      <div class="left-scroll" id="deptCards"></div>
-    </div>
-    <div class="col-right">
-      <div id="summaryContent" class="summary"><div class="empty">勾選部門後這裡會顯示彙總</div></div>
-      <div id="benchmark"></div>
+  <!-- Main -->
+  <div class="main">
+    <div class="content" id="stepContent"></div>
+    <div class="sidebar">
+      <div class="sbo" id="sidebarOverview"></div>
     </div>
   </div>
 </div>
