@@ -694,8 +694,12 @@ function step5HTML() {
     const s2 = snapshots.slice(-6);
     snapRows = `<div class="scard" style="margin-top:16px;">
       <div class="scard-title">📅 月份比較</div>
-      <table class="r-table"><thead><tr><th>月份</th><th>總預算</th><th>總成本</th><th>佔用率</th><th>健康</th></tr></thead>
-      <tbody>${s2.map(s => { const h = calcHealth(s.laborRatio, bench); return `<tr><td>${s.month}</td><td class="r">NT$ ${(s.annualTotal/10000).toLocaleString()} 萬</td><td class="r">NT$ ${(s.used/10000).toLocaleString()} 萬</td><td class="r">${s.pct}%</td><td style="color:${h.color};">${h.text}</td></tr>`; }).join('')}</tbody></table>
+      <table class="r-table"><thead><tr><th>月份</th><th>總預算</th><th>總成本</th><th>佔用率</th><th>健康</th><th></th></tr></thead>
+      <tbody>${s2.map((s, si) => {
+        const idx = snapshots.length - 6 + si;
+        const h = calcHealth(s.laborRatio, bench);
+        return `<tr><td>${s.month}</td><td class="r">NT$ ${(s.annualTotal/10000).toLocaleString()} 萬</td><td class="r">NT$ ${(s.used/10000).toLocaleString()} 萬</td><td class="r">${s.pct}%</td><td style="color:${h.color};">${h.text}</td><td><button class="btn" style="font-size:10px;padding:1px 6px;color:#ef4444;" onclick="window.delSnapshot(${Math.max(0, idx)})">✕</button></td></tr>`;
+      }).join('')}</tbody></table>
     </div>`;
   }
 
@@ -740,6 +744,16 @@ window.saveSnapshot = function() {
   renderStepContent();
 };
 
+window.delSnapshot = function(idx) {
+  if (!confirm('刪除這筆快照？')) return;
+  const snapshots = getSnapshots();
+  if (idx < 0 || idx >= snapshots.length) return;
+  snapshots.splice(idx, 1);
+  localStorage.setItem('salary_snapshots', JSON.stringify(snapshots));
+  document.getElementById('planStatus').textContent = '🗑 已刪除';
+  renderStepContent();
+};
+
 // ── Grade Matrix Management ──
 window.updGradeMatrix = function(family, grade, lvlIdx, field, val) {
   if (!data.gradeMatrix) data.gradeMatrix = JSON.parse(JSON.stringify(DEFAULT_GRADE_MATRIX));
@@ -750,9 +764,12 @@ window.updGradeMatrix = function(family, grade, lvlIdx, field, val) {
 window.showGradeMatrixEditor = function() {
   const matrix = data.gradeMatrix || DEFAULT_GRADE_MATRIX;
   const families = JOB_FAMILIES.filter(f => matrix[f] && matrix[f].length > 0);
+  const oldOverlay = document.querySelector('[data-overlay="grade-editor"]');
+  if (oldOverlay) oldOverlay.remove();
   const bg = document.createElement('div');
+  bg.setAttribute('data-overlay', 'grade-editor');
   bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;';
-  bg.onclick = e => { if (e.target === bg) bg.remove(); };
+  bg.onclick = e => { if (e.target === bg) { bg.remove(); save(); render(); } };
   const famHtml = families.map(family => {
     const grades = matrix[family];
     const pm = FAMILY_PAYMIX[family] || {};
@@ -800,7 +817,10 @@ window.showGradeMatrixEditor = function() {
   bg.innerHTML = `<div style="background:#fff;border-radius:12px;padding:24px;min-width:600px;max-width:700px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);" onclick="event.stopPropagation()">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
       <h3 style="font-size:16px;font-weight:700;">📊 編輯職等職級對照表</h3>
-      <button class="btn" onclick="window.addJobFamily()">＋ 新增職系</button>
+      <div style="display:flex;gap:6px;">
+        <button class="btn" onclick="window.addJobFamily()">＋ 新增職系</button>
+        <button class="btn" onclick="bg.remove();save();render();" style="font-size:18px;padding:2px 12px;line-height:1;">✕</button>
+      </div>
     </div>
     <div style="background:#f0f9ff;padding:8px 12px;border-radius:8px;margin-bottom:16px;font-size:11px;color:#1e40af;">每個職系獨立編輯。帶寬建議：基層20-30%、中階30-40%、高階40-60%。</div>
     ${famHtml}
