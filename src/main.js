@@ -40,8 +40,19 @@ function migrateData() {
       const hc = data.headcounts[id] || 1;
       const alloc = createDefaultAllocation(hc, d ? d.name : '部門', cfg.type || '平路型', data.gradeMatrix);
       if (alloc.length) cfg.gradeAllocation = alloc;
-      else cfg.gradeAllocation = [{ grade: -1, level: 1, title: '人員', headcount: hc, annualTotal: cfg.annualTotal || 600000, fixedRatio: cfg.fixedRatio || 70, behaviorRatio: cfg.behaviorRatio || 10, performanceRatio: cfg.performanceRatio || 20, fixedAnnual: cfg.fixedAnnual || 420000, behaviorAnnual: cfg.behaviorAnnual || 60000, perfAnnual: cfg.perfAnnual || 120000, monthlyBase: cfg.monthlyBase || 35000, subjects: { base: [{ name: '基本薪資', amount: cfg.fixedAnnual || 420000 }], behavior: [{ name: '獎金', amount: cfg.behaviorAnnual || 60000 }], performance: [{ name: '績效', amount: cfg.perfAnnual || 120000 }] } }];
+      else cfg.gradeAllocation = [{ grade: -1, level: 1, title: '人員', headcount: hc, annualTotal: cfg.annualTotal || 600000, subjects: { base: [{ name: '基本薪資', monthly: Math.round((cfg.fixedAnnual || 420000) / 12) }], behavior: [{ name: '獎金', monthly: Math.round((cfg.behaviorAnnual || 60000) / 12) }], performance: [{ name: '績效', monthly: Math.round((cfg.perfAnnual || 120000) / 12) }] } }];
     }
+    // Convert old subject amounts (annual) to monthly
+    (cfg?.gradeAllocation || []).forEach(a => {
+      ['base','behavior','performance'].forEach(cat => {
+        (a.subjects?.[cat] || []).forEach(item => {
+          if (item.monthly === undefined) {
+            item.monthly = item.amount !== undefined ? Math.round(Number(item.amount) / 12) : 0;
+            delete item.amount;
+          }
+        });
+      });
+    });
   });
 }
 
@@ -85,24 +96,31 @@ function getDeptBudget(d) {
   return totalHC > 0 ? Math.round(getAnnualTotal() * hc / totalHC) : 0;
 }
 
+function calcAllocRow(a) {
+  const getM = item => item.monthly !== undefined ? Number(item.monthly) : (item.amount !== undefined ? Math.round(Number(item.amount) / 12) : 0);
+  const monthlyBase = (a.subjects?.base || []).reduce((s, item) => s + getM(item), 0);
+  const monthlyBehavior = (a.subjects?.behavior || []).reduce((s, item) => s + getM(item), 0);
+  const monthlyPerf = (a.subjects?.performance || []).reduce((s, item) => s + getM(item), 0);
+  const monthlyTotal = monthlyBase + monthlyBehavior + monthlyPerf;
+  const annualBase = monthlyBase * 12;
+  const annualBehavior = monthlyBehavior * 12;
+  const annualPerf = monthlyPerf * 12;
+  const annualTotal = monthlyTotal * 12;
+  const ref = a.annualTotal || 1;
+  const fr = Math.round(annualBase / ref * 100);
+  const br = Math.round(annualBehavior / ref * 100);
+  const pr = Math.round(annualPerf / ref * 100);
+  return { monthlyBase, monthlyBehavior, monthlyPerf, monthlyTotal, annualBase, annualBehavior, annualPerf, annualTotal, fr, br, pr, over: annualTotal - ref };
+}
+
 function calcAllocSummary(alloc) {
-  let totalHC = 0, totalAnnual = 0, totalF = 0, totalB = 0, totalP = 0;
+  let totalHC = 0, totalAnnual = 0;
   (alloc || []).forEach(a => {
+    const r = calcAllocRow(a);
     totalHC += a.headcount || 0;
-    totalAnnual += (a.annualTotal || 0) * (a.headcount || 0);
-    totalF += (a.fixedAnnual || 0) * (a.headcount || 0);
-    totalB += (a.behaviorAnnual || 0) * (a.headcount || 0);
-    totalP += (a.perfAnnual || 0) * (a.headcount || 0);
+    totalAnnual += r.annualTotal * (a.headcount || 0);
   });
-  const deptTotal = totalAnnual;
-  const avgAnnual = totalHC > 0 ? Math.round(totalAnnual / totalHC) : 0;
-  const avgF = totalHC > 0 ? Math.round(totalF / totalHC) : 0;
-  const avgB = totalHC > 0 ? Math.round(totalB / totalHC) : 0;
-  const avgP = totalHC > 0 ? Math.round(totalP / totalHC) : 0;
-  const fr = deptTotal > 0 ? Math.round(totalF / deptTotal * 100) : 0;
-  const br = deptTotal > 0 ? Math.round(totalB / deptTotal * 100) : 0;
-  const pr = deptTotal > 0 ? Math.round(totalP / deptTotal * 100) : 0;
-  return { totalHC, deptTotal, totalAnnual, totalF, totalB, totalP, avgAnnual, avgF, avgB, avgP, fr, br, pr };
+  return { totalHC, deptTotal: totalAnnual, totalAnnual };
 }
 
 function ensureAlloc(d) {
@@ -123,7 +141,7 @@ function ensureAlloc(d) {
   if (alloc && alloc.length) {
     cfg2.gradeAllocation = alloc;
   } else {
-    cfg2.gradeAllocation = [{ grade: -1, level: 1, title: d.name + '人員', headcount: hc, annualTotal: 600000, fixedRatio: 70, behaviorRatio: 10, performanceRatio: 20, fixedAnnual: 420000, behaviorAnnual: 60000, perfAnnual: 120000, monthlyBase: 35000, subjects: { base: [{ name: '基本薪資', amount: 420000 }], behavior: [{ name: '獎金', amount: 60000 }], performance: [{ name: '績效', amount: 120000 }] } }];
+    cfg2.gradeAllocation = [{ grade: -1, level: 1, title: d.name + '人員', headcount: hc, annualTotal: 600000, subjects: { base: [{ name: '基本薪資', monthly: 35000 }], behavior: [{ name: '獎金', monthly: 5000 }], performance: [{ name: '績效', monthly: 10000 }] } }];
   }
   save();
 }
@@ -333,79 +351,93 @@ function step3HTML() {
     const usgLabel = usage <= 80 ? '✅ 有餘裕' : usage <= 100 ? '⚠ 接近預算' : '🚫 超出預算！';
     const borderColor = usage > 100 ? '#ef4444' : '#e2e8f0';
 
-    // Build allocation table rows
+    // Build allocation rows — monthly-based
     const expandedState = window._expanded || {};
     const allocRows = alloc.map((a, ai) => {
       const isOpen = expandedState[`${d.id}_${ai}`];
       const jf = getJobFamilyForDept(d.type);
       const grades = (data.gradeMatrix || DEFAULT_GRADE_MATRIX)[jf] || [];
       const titleOptions = grades.map(g => `<option value="${g.grade}" ${g.grade === a.grade ? 'selected' : ''}>${g.title} ${g.grade}等</option>`).join('');
-      const recalc = (annual, fr, br, pr) => {
-        const fa = Math.round(annual * fr / 100);
-        const ba = Math.round(annual * br / 100);
-        const pa = Math.round(annual * pr / 100);
-        const mb = Math.round(fa / 12);
-        return { fa, ba, pa, mb };
-      };
+      const r = calcAllocRow(a);
+      const catLabels = { base: '固定', behavior: '行為', performance: '績效' };
+      const catColors = { base: '#1a237e', behavior: '#e65100', performance: '#2e7d32' };
+      const catTarget = { base: 40, behavior: 10, performance: 50 };
 
-      return `<div style="border-bottom:1px solid #f1f5f9;">
-        <div class="alloc-summary" style="padding:8px 12px;cursor:pointer;" onclick="window.toggleAlloc('${d.id}',${ai})">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <span style="color:#94a3b8;font-size:14px;">${isOpen ? '▾' : '▸'}</span>
-            <select onchange="window.updAllocCell('${d.id}',${ai},'grade',this.value);event.stopPropagation();" style="font-size:13px;font-weight:600;padding:2px 6px;border:1px solid #e2e8f0;border-radius:4px;" onclick="event.stopPropagation()">${titleOptions}</select>
-            <span style="font-size:13px;color:#475569;">
-              <input type="number" value="${a.headcount}" min="0" max="999" style="width:50px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:13px;text-align:center;" onchange="window.updAllocCell('${d.id}',${ai},'hc',this.value);event.stopPropagation();" onclick="event.stopPropagation()">人
-            </span>
-            <span style="margin-left:auto;font-size:12px;color:#64748b;">年薪總包 NT$ ${a.annualTotal.toLocaleString()}／人</span>
-            ${ai > 0 ? `<button class="btn" style="font-size:10px;padding:1px 8px;color:#ef4444;" onclick="window.delAllocRow('${d.id}',${ai});event.stopPropagation();">✕</button>` : ''}
-          </div>
-          <div style="display:flex;gap:16px;margin-top:4px;margin-left:22px;font-size:12px;flex-wrap:wrap;">
-            <span><strong style="color:#1a237e;">固定${a.fixedRatio}%</strong> NT$ ${a.fixedAnnual.toLocaleString()}</span>
-            <span><strong style="color:#e65100;">行為${a.behaviorRatio}%</strong> NT$ ${a.behaviorAnnual.toLocaleString()}</span>
-            <span><strong style="color:#2e7d32;">績效${a.performanceRatio}%</strong> NT$ ${a.perfAnnual.toLocaleString()}</span>
-            <span style="margin-left:auto;font-weight:600;">小計 NT$ ${(a.annualTotal * a.headcount).toLocaleString()}</span>
-          </div>
-        </div>
-        ${isOpen ? `<div class="alloc-detail" style="background:#fafbff;padding:8px 12px 8px 42px;font-size:12px;">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
-            ${['base','behavior','performance'].map(cat => {
-              const catLabel = { base: '固定', behavior: '行為', performance: '績效' }[cat];
-              const catVal = { base: a.fixedAnnual, behavior: a.behaviorAnnual, performance: a.perfAnnual }[cat];
-              const items = (a.subjects && a.subjects[cat]) || [];
-              const template = data.deptConfigs[d.id]?.subjects || {};
-              const templateCats = template[cat] || [];
-              const usedNames = items.map(s => s.name);
-              const available = templateCats.filter(n => !usedNames.includes(n) && typeof n === 'string');
-              return `<div>
-                <div style="font-weight:600;color:#475569;margin-bottom:4px;font-size:11px;">${catLabel}</div>
-                ${items.map((s, si) => `<div style="display:flex;align-items:center;gap:4px;margin:2px 0;">
-                  <span style="font-size:11px;min-width:70px;color:#1e293b;">${s.name}</span>
-                  <input type="number" value="${s.amount}" style="width:70px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:3px;font-size:11px;" onchange="window.updAllocSubj('${d.id}',${ai},'${cat}',${si},'amount',this.value)">
-                  <span style="cursor:pointer;color:#ef4444;font-size:14px;" onclick="window.delAllocSubj('${d.id}',${ai},'${cat}',${si})">×</span>
-                </div>`).join('')}
-                <div style="margin-top:4px;">
-                  <select onchange="window.addAllocSubj('${d.id}',${ai},'${cat}',this.value);this.value='';" style="font-size:11px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:3px;width:100%;">
-                    <option value="">＋ 新增科目</option>
-                    ${available.map(n => `<option value="${n}">${n}</option>`).join('')}
-                    ${available.length > 0 ? `<option value="__custom__">──── 自訂新科目 ────</option>` : ''}
-                    <option value="__custom__">✏ 自訂新科目</option>
-                  </select>
-                </div>
+      const detailHtml = isOpen ? `<div class="alloc-detail" style="background:#f8fafc;padding:6px 12px 6px 42px;">
+        ${['base','behavior','performance'].map(cat => {
+          const items = (a.subjects && a.subjects[cat]) || [];
+          const catR = { base: r.monthlyBase, behavior: r.monthlyBehavior, performance: r.monthlyPerf }[cat];
+          const catAnn = { base: r.annualBase, behavior: r.annualBehavior, performance: r.annualPerf }[cat];
+          const catPct = { base: r.fr, behavior: r.br, performance: r.pr }[cat];
+          const targetPct = catTarget[cat];
+          const diff = catPct - targetPct;
+          const template = data.deptConfigs[d.id]?.subjects || {};
+          const templateCats = template[cat] || [];
+          const usedNames = items.map(s => s.name);
+          const available = templateCats.filter(n => !usedNames.includes(n) && typeof n === 'string');
+          return `<div style="margin-bottom:8px;">
+            <div style="font-size:12px;font-weight:600;color:${catColors[cat]};margin-bottom:4px;display:flex;align-items:center;gap:8px;">
+              <span>${catLabels[cat]}</span>
+              <input type="number" value="${catPct}" min="0" max="100" style="width:45px;padding:1px 4px;border:1px solid #e2e8f0;border-radius:3px;font-size:11px;font-weight:400;text-align:center;" onchange="window.distribAllocPct('${d.id}',${ai},'${cat}',this.value)">
+              <span style="font-size:11px;font-weight:400;color:#64748b;">%</span>
+            </div>
+            ${items.length === 0 ? `<div style="font-size:11px;color:#94a3b8;font-style:italic;">（尚無科目）</div>` : ''}
+            ${items.map((s, si) => {
+              const sv = s.monthly !== undefined ? s.monthly : (s.amount || 0);
+              return `<div style="display:flex;align-items:center;gap:4px;margin:2px 0;font-size:12px;">
+                <span style="min-width:70px;color:#1e293b;">${s.name}</span>
+                <input type="number" value="${sv}" min="0" style="width:65px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:3px;font-size:12px;text-align:right;" onchange="window.updAllocSubj('${d.id}',${ai},'${cat}',${si},this.value)">
+                <span style="font-size:11px;color:#94a3b8;">/月</span>
+                <span style="font-size:11px;color:#94a3b8;">年 ${(sv * 12).toLocaleString()}</span>
+                <span style="cursor:pointer;color:#ef4444;font-size:14px;margin-left:4px;" onclick="window.delAllocSubj('${d.id}',${ai},'${cat}',${si})">×</span>
               </div>`;
             }).join('')}
+            <div style="margin-top:2px;display:flex;gap:4px;align-items:center;">
+              <select onchange="window.addAllocSubj('${d.id}',${ai},'${cat}',this.value);this.value='';" style="font-size:11px;padding:1px 4px;border:1px solid #e2e8f0;border-radius:3px;">
+                <option value="">＋ 新增科目</option>
+                ${available.map(n => `<option value="${n}">${n}</option>`).join('')}
+                <option value="__custom__">✏ 自訂新科目</option>
+              </select>
+              <span style="font-size:11px;margin-left:auto;color:${diff > 5 ? '#ef4444' : diff < -5 ? '#f59e0b' : '#10b981'};">
+                小計 ${catR.toLocaleString()}/月 → 年 ${catAnn.toLocaleString()}（${catPct}%${diff > 0 ? ' ⚠超' : ''}）
+              </span>
+            </div>
+          </div>`;
+        }).join('')}
+        <div style="border-top:1px solid #e2e8f0;padding-top:6px;margin-top:4px;font-size:12px;display:flex;gap:16px;flex-wrap:wrap;">
+          <span>每人月薪 <strong>NT$ ${r.monthlyTotal.toLocaleString()}</strong></span>
+          <span>每人年薪 <strong>NT$ ${r.annualTotal.toLocaleString()}</strong></span>
+          <span style="color:${r.over > 0 ? '#ef4444' : r.over < 0 ? '#10b981' : '#64748b'};">
+            目標 ${a.annualTotal.toLocaleString()} ${r.over > 0 ? `⚠ 超額 ${r.over.toLocaleString()}` : r.over < 0 ? `✅ 餘裕 ${Math.abs(r.over).toLocaleString()}` : '持平'}
+          </span>
+        </div>
+      </div>` : '';
+
+      return `<div style="border-bottom:1px solid #f1f5f9;">
+        <div class="alloc-summary" style="padding:6px 12px;cursor:pointer;" onclick="window.toggleAlloc('${d.id}',${ai})">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="color:#94a3b8;font-size:14px;">${isOpen ? '▾' : '▸'}</span>
+            <select onchange="window.updAllocCell('${d.id}',${ai},'grade',this.value);event.stopPropagation();" style="font-size:13px;font-weight:600;padding:1px 4px;border:1px solid #e2e8f0;border-radius:4px;" onclick="event.stopPropagation()">${titleOptions}</select>
+            <input type="number" value="${a.headcount}" min="0" max="999" style="width:40px;padding:1px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;" onchange="window.updAllocCell('${d.id}',${ai},'hc',this.value);event.stopPropagation();" onclick="event.stopPropagation()">
+            <span style="margin-left:auto;font-size:12px;color:#64748b;">目標 ${a.annualTotal.toLocaleString()} 實${r.monthlyTotal.toLocaleString()}/月 ${r.annualTotal.toLocaleString()}/年</span>
+            ${ai > 0 ? `<button class="btn" style="font-size:10px;padding:0 6px;color:#ef4444;" onclick="window.delAllocRow('${d.id}',${ai});event.stopPropagation();">✕</button>` : ''}
           </div>
-          <div style="margin-top:6px;font-size:10px;color:#94a3b8;">月固定 NT$ ${a.monthlyBase.toLocaleString()}／人</div>
-        </div>` : ''}
+          <div style="display:flex;gap:12px;margin-top:2px;margin-left:22px;font-size:11px;flex-wrap:wrap;">
+            <span style="color:#1a237e;">固定 ${r.monthlyBase.toLocaleString()}/月（${r.fr}%）</span>
+            <span style="color:#e65100;">行為 ${r.monthlyBehavior.toLocaleString()}/月（${r.br}%）</span>
+            <span style="color:#2e7d32;">績效 ${r.monthlyPerf.toLocaleString()}/月（${r.pr}%）</span>
+          </div>
+        </div>
+        ${detailHtml}
       </div>`;
     }).join('');
 
-    const totRow = summary.totalHC > 0 ? `<div style="padding:10px 12px;font-size:13px;font-weight:700;background:#f8fafc;border-top:2px solid #0f172a;">
+    const summaryAlloc = calcAllocSummary(alloc);
+    const totRow = summaryAlloc.totalHC > 0 ? `<div style="padding:8px 12px;font-size:13px;font-weight:700;background:#f8fafc;border-top:2px solid #0f172a;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-        <span>合計 <strong>${summary.totalHC}人</strong></span>
-        <span>固定${summary.fr}% NT$ ${summary.totalF.toLocaleString()}</span>
-        <span>行為${summary.br}% NT$ ${summary.totalB.toLocaleString()}</span>
-        <span>績效${summary.pr}% NT$ ${summary.totalP.toLocaleString()}</span>
-        <span style="color:#1a237e;">總計 NT$ ${summary.deptTotal.toLocaleString()}</span>
+        <span>合計 <strong>${summaryAlloc.totalHC}人</strong></span>
+        <span>實計年薪 <strong>NT$ ${summaryAlloc.deptTotal.toLocaleString()}</strong></span>
+        <span style="color:${usage > 100 ? '#ef4444' : usage > 80 ? '#f59e0b' : '#10b981'};">預算${usage}% ${usgLabel}</span>
       </div>
     </div>` : '';
 
@@ -475,39 +507,55 @@ window.updAllocCell = function(deptId, idx, field, val) {
     const jf = getJobFamilyForDept((data.departments.find(x => x.id === deptId) || {}).type);
     const grades = (data.gradeMatrix || DEFAULT_GRADE_MATRIX)[jf] || [];
     const g = grades.find(x => x.grade === Number(val));
-    if (g) {
-      a.grade = g.grade;
-      a.title = g.title;
-      a.level = g.levels[Math.floor(g.levels.length / 2)]?.level || 1;
-    }
+    if (g) { a.grade = g.grade; a.title = g.title; a.level = g.levels[Math.floor(g.levels.length / 2)]?.level || 1; }
   } else if (field === 'hc') { a.headcount = Math.min(999, Math.max(0, num)); }
-  else if (field === 'annual') { a.annualTotal = Math.max(100000, num); }
-  else if (field === 'fr') {
-    a.fixedRatio = Math.min(100, Math.max(0, num));
-    const remain = 100 - a.fixedRatio;
-    const tf = a.behaviorRatio + a.performanceRatio;
-    if (tf > 0) { a.behaviorRatio = Math.round(remain * a.behaviorRatio / tf); a.performanceRatio = remain - a.behaviorRatio; }
-    else { a.behaviorRatio = Math.round(remain * 0.5); a.performanceRatio = remain - a.behaviorRatio; }
-  } else if (field === 'br') {
-    a.behaviorRatio = Math.min(100 - a.fixedRatio, Math.max(0, num));
-    a.performanceRatio = 100 - a.fixedRatio - a.behaviorRatio;
-  } else if (field === 'pr') {
-    a.performanceRatio = Math.min(100 - a.fixedRatio, Math.max(0, num));
-    a.behaviorRatio = 100 - a.fixedRatio - a.performanceRatio;
+  save();
+  renderStepContent();
+};
+
+window.distribAllocPct = function(deptId, idx, cat, pctVal) {
+  const alloc = data.deptConfigs[deptId]?.gradeAllocation;
+  if (!alloc || !alloc[idx]) return;
+  const a = alloc[idx];
+  const pct = Math.min(100, Math.max(0, parseInt(pctVal) || 0));
+  const monthlyTotal = Math.round(a.annualTotal * pct / 100 / 12);
+  const items = a.subjects?.[cat];
+  if (!items || !items.length) {
+    if (!a.subjects) a.subjects = { base: [], behavior: [], performance: [] };
+    if (!a.subjects[cat]) a.subjects[cat] = [];
+    a.subjects[cat].push({ name: cat === 'base' ? '固定薪資' : cat === 'behavior' ? '行為獎金' : '績效獎金', monthly: monthlyTotal });
+  } else if (items.length === 1) {
+    items[0].monthly = monthlyTotal;
+  } else {
+    const each = Math.round(monthlyTotal / items.length);
+    items.forEach((item, i) => { item.monthly = i === items.length - 1 ? monthlyTotal - each * (items.length - 1) : each; });
   }
-  a.fixedAnnual = Math.round(a.annualTotal * a.fixedRatio / 100);
-  a.behaviorAnnual = Math.round(a.annualTotal * a.behaviorRatio / 100);
-  a.perfAnnual = Math.round(a.annualTotal * a.performanceRatio / 100);
-  a.monthlyBase = Math.round(a.fixedAnnual / 12);
-  // Recalculate subjects amounts proportionally
-  ['base','behavior','performance'].forEach(cat => {
-    const total = { base: a.fixedAnnual, behavior: a.behaviorAnnual, performance: a.perfAnnual }[cat];
-    const items = a.subjects && a.subjects[cat];
-    if (items && items.length) {
-      const each = Math.round(total / items.length);
-      items.forEach((item, i) => { item.amount = i === items.length - 1 ? total - each * (items.length - 1) : each; });
-    }
-  });
+  save();
+  renderStepContent();
+};
+
+window.updAllocSubj = function(deptId, idx, cat, si, val) {
+  const alloc = data.deptConfigs[deptId]?.gradeAllocation;
+  if (!alloc || !alloc[idx] || !alloc[idx].subjects || !alloc[idx].subjects[cat]) return;
+  alloc[idx].subjects[cat][si].monthly = Math.max(0, parseInt(val) || 0);
+  save();
+};
+
+window.addAllocSubj = function(deptId, idx, cat, name) {
+  if (!name || name === '' || name === '__custom__') { name = prompt('請輸入科目名稱：'); if (!name) return; }
+  const alloc = data.deptConfigs[deptId]?.gradeAllocation;
+  if (!alloc || !alloc[idx]) return;
+  if (!alloc[idx].subjects) alloc[idx].subjects = { base: [], behavior: [], performance: [] };
+  if (!alloc[idx].subjects[cat]) alloc[idx].subjects[cat] = [];
+  alloc[idx].subjects[cat].push({ name, monthly: 0 });
+  save();
+  renderStepContent();
+};
+
+window.delAllocSubj = function(deptId, idx, cat, si) {
+  const alloc = data.deptConfigs[deptId]?.gradeAllocation;
+  if (!alloc || !alloc[idx] || !alloc[idx].subjects || !alloc[idx].subjects[cat]) return;
+  alloc[idx].subjects[cat].splice(si, 1);
   save();
   renderStepContent();
 };
@@ -564,7 +612,7 @@ window.addAllocRow = function(deptId) {
   const alloc = data.deptConfigs[deptId]?.gradeAllocation;
   if (!alloc) return;
   const last = alloc[alloc.length - 1];
-  const defaults = { grade: last ? last.grade - 1 : 1, level: 1, title: '新進人員', headcount: 1, annualTotal: 400000, fixedRatio: 80, behaviorRatio: 10, performanceRatio: 10, fixedAnnual: 320000, behaviorAnnual: 40000, perfAnnual: 40000, monthlyBase: 26667, subjects: { base: [{ name: '基本薪資', amount: 320000 }], behavior: [{ name: '獎金', amount: 40000 }], performance: [{ name: '績效', amount: 40000 }] } };
+  const defaults = { grade: last ? last.grade - 1 : 1, level: 1, title: '新進人員', headcount: 1, annualTotal: 400000, subjects: { base: [{ name: '基本薪資', monthly: 25000 }], behavior: [{ name: '獎金', monthly: 3000 }], performance: [{ name: '績效', monthly: 3000 }] } };
   alloc.push(JSON.parse(JSON.stringify(defaults)));
   save();
   renderStepContent();

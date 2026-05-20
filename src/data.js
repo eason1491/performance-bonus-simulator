@@ -342,9 +342,8 @@ export function createDefaultAllocation(headcount, deptName, deptType, gradeMatr
   }
 
   const subj = getDeptSubjects(deptName, deptType);
-  const withAmounts = (names, total) => names.map((n, i, a) => ({ name: n, amount: i === a.length - 1 ? total - Math.round(total / a.length) * (a.length - 1) : Math.round(total / a.length) }));
+  const withMonthly = (names, totalMonthly) => names.map((n, i, a) => ({ name: n, monthly: i === a.length - 1 ? totalMonthly - Math.round(totalMonthly / a.length) * (a.length - 1) : Math.round(totalMonthly / a.length) }));
   return tierGrades.map(t => {
-    // 找到 grade 表中第一個 >= t.grade 的職等
     let g = null;
     for (let i = 0; i < grades.length; i++) {
       if (grades[i].grade >= t.grade) { g = grades[i]; break; }
@@ -353,18 +352,16 @@ export function createDefaultAllocation(headcount, deptName, deptType, gradeMatr
     const lvl = g.levels ? g.levels[Math.floor(g.levels.length / 2)] : null;
     const midMonthly = lvl ? Math.round((lvl.min + lvl.max) / 2) : 30000;
     const annualTotal = midMonthly * 14;
-    const fixedAnnual = Math.round(annualTotal * baseRatios.fixed / 100);
-    const behaviorAnnual = Math.round(annualTotal * baseRatios.behavior / 100);
-    const perfAnnual = Math.round(annualTotal * baseRatios.performance / 100);
+    const fixedM = Math.round(midMonthly * baseRatios.fixed / 100);
+    const behaviorM = Math.round(midMonthly * baseRatios.behavior / 100);
+    const perfM = Math.round(midMonthly * baseRatios.performance / 100);
     return {
       grade: g ? g.grade : -1, level: lvl ? lvl.level : 1, title: g ? g.title : t.label,
       headcount: t.count, annualTotal,
-      fixedRatio: baseRatios.fixed, behaviorRatio: baseRatios.behavior, performanceRatio: baseRatios.performance,
-      fixedAnnual, behaviorAnnual, perfAnnual, monthlyBase: Math.round(fixedAnnual / 12),
       subjects: {
-        base: withAmounts(subj.base, fixedAnnual),
-        behavior: withAmounts(subj.behavior, behaviorAnnual),
-        performance: withAmounts(subj.performance, perfAnnual)
+        base: withMonthly(subj.base, fixedM),
+        behavior: withMonthly(subj.behavior, behaviorM),
+        performance: withMonthly(subj.performance, perfM)
       }
     };
   });
