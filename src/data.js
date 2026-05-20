@@ -372,7 +372,7 @@ export const DEFAULT_GRADES = [
 export function calcHealth(laborRatio, bench) {
   if (!bench) return { text: '—', color: '#94a3b8', bg: '#f8fafc' };
   const range = parseRange(bench.laborRate);
-  const r = laborRatio;
+  const r = Number(laborRatio);
   if (r < range.min * 0.8) return { text: '⚠️ 偏低', color: '#f59e0b', bg: '#fffbeb' };
   if (r <= range.max) return { text: '✅ 很健康', color: '#10b981', bg: '#f0fdf4' };
   if (r <= range.max * 1.3) return { text: '⚡ 有問題', color: '#f97316', bg: '#fff7ed' };

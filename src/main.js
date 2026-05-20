@@ -898,7 +898,7 @@ function renderSidebar() {
   let allocatedTotal = 0, deptLines = '';
   depts.forEach(d => {
     const alloc = data.deptConfigs[d.id]?.gradeAllocation || [];
-    const s = calcAllocSummary(alloc);
+    const s = alloc.length ? calcAllocSummary(alloc) : { totalHC: 0, deptTotal: 0 };
     if (s.totalHC > 0) allocatedTotal += s.deptTotal;
     deptLines += `<div class="sbo-row"><span class="sbo-lbl">${d.name}</span><span class="sbo-val">${s.totalHC > 0 ? `NT$${Math.round(s.deptTotal/10000).toLocaleString()}萬` : '—'}</span></div>`;
   });
