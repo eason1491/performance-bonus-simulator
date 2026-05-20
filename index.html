@@ -500,7 +500,15 @@ function loadExample() {
 }
 
 // 初始載入範例
-loadExample();
+window.addEventListener('DOMContentLoaded', function() {
+  try {
+    loadExample();
+  } catch(e) {
+    document.getElementById('healthCheck').innerHTML =
+      '<div class="danger-box">🔴 JavaScript 錯誤：' + e.message + '<br>請按 Ctrl+Shift+R 重新整理頁面，或檢查瀏覽器 Console (F12)</div>';
+    throw e;
+  }
+});
 </script>
 </body>
 </html>
