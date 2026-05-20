@@ -1,6 +1,5 @@
 import { calculate } from './calculate.js';
-import { supabase, signInWithGoogle, signOut, onAuthChange, getCurrentUser } from './auth.js';
-import { loadPlans, savePlan as dbSavePlan, deletePlan as dbDeletePlan, getDefaultPlan } from './storage.js';
+import { signInWithGoogle, signOut, onAuthChange, getCurrentUser, loadPlans, savePlan as dbSavePlan, deletePlan as dbDeletePlan, getDefaultPlan } from './auth.js';
 import { exportCSV as doExportCSV, exportPDF as doExportPDF, exportComparisonCSV } from './export.js';
 
 // ── State ──
