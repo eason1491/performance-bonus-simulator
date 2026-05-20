@@ -78,30 +78,45 @@ function updateDepts() {
     const pc = cfg ? cfg.perfAnnual : Math.round(600000 * r.performance / 100);
 
     const subj = DEPT_SUBJECTS[d];
+    const floatPct = (cfg || r).behaviorRatio + (cfg || r).performanceRatio;
+    const fr = cfg ? cfg.fixedRatio : r.fixed;
+    const br = cfg ? cfg.behaviorRatio : r.behavior;
+    const pr = cfg ? cfg.performanceRatio : r.performance;
     return `<div class="d-card ${checked ? 'on' : 'off'}" id="card-${d}">
       <div class="d-head" onclick="window.toggleDept('${d}')">
         <input type="checkbox" ${checked ? 'checked' : ''} onclick="event.stopPropagation();window.toggleDept('${d}')">
         <span class="d-name">${d}</span>
         <span class="d-type ${tClass}">${type}</span>
-        <span class="d-desc">${r.desc}</span>
+        <span class="d-desc">${r.desc}｜${ONE_LINERS[d]}</span>
       </div>
       <div class="d-body ${checked ? '' : 'hidden'}">
-        <div class="d-field" style="margin-bottom:8px;"><label>年薪總包</label><input type="number" value="${ac}" min="200000" max="5000000" step="10000" oninput="window.updCfg('${d}','total',this.value)"></div>
-        <div style="margin-bottom:10px;font-size:13px;background:#f8f9fa;border-radius:6px;padding:10px;">
-          <div style="font-weight:600;color:#1a1a2e;margin-bottom:6px;">固定 <span style="color:#4361ee;">${r.fixed}%</span>　NT$ ${fc.toLocaleString()}/年（月 ${mb.toLocaleString()}）</div>
-          <div style="font-size:12px;color:#888;margin-bottom:8px;padding-left:12px;border-left:2px solid #ddd;">
-            <strong>基本資格</strong>：${subj.base.join('、')}
+        <div class="d-top">
+          <div class="d-total"><label>年薪總包</label><input type="number" value="${ac}" min="200000" max="5000000" step="10000" oninput="window.updCfg('${d}','total',this.value)"></div>
+          <div class="d-pct"><label>固定 %</label><input type="number" value="${fr}" min="0" max="100" oninput="window.updCfg('${d}','fixedPct',this.value)"></div>
+          <div class="d-pct"><label>行為(考核) %</label><input type="number" value="${br}" min="0" max="100" oninput="window.updCfg('${d}','behavePct',this.value)"></div>
+          <div class="d-pct"><label>績效 %</label><input type="number" value="${pr}" min="0" max="100" oninput="window.updCfg('${d}','perfPct',this.value)"></div>
+        </div>
+        <div class="d-preview">
+          <div class="d-preview-row fixed">
+            <div class="d-pr-label">固定 ${fr}%</div>
+            <div class="d-pr-val">NT$ ${fc.toLocaleString()}/年</div>
+            <div class="d-pr-sub">月 ${mb.toLocaleString()}</div>
+            <div class="d-pr-items">${subj.base.join('、')}</div>
           </div>
-          <div style="font-weight:600;color:#1a1a2e;margin-bottom:6px;margin-top:8px;">浮動 <span style="color:#e67e22;">${r.behavior + r.performance}%</span>　NT$ ${(bc + pc).toLocaleString()}/年</div>
-          <div style="font-size:12px;color:#888;padding-left:12px;border-left:2px solid #e67e22;">
-            <div style="margin-bottom:4px;"><strong>行為獎金（考核 ${r.behavior}% NT$ ${bc.toLocaleString()}）</strong>：${subj.behavior.join('、')}</div>
-            <div><strong>績效獎金（${r.performance}% NT$ ${pc.toLocaleString()}）</strong>：${subj.performance.join('、')}</div>
+          <div class="d-preview-row float">
+            <div class="d-pr-label">浮動 ${floatPct}%</div>
+            <div class="d-pr-val">NT$ ${(bc + pc).toLocaleString()}/年</div>
+            <div class="d-pr-sub"></div>
+            <div class="d-pr-items">
+              <span><strong>行為考核 ${br}%</strong> NT$ ${bc.toLocaleString()}：${subj.behavior.join('、')}</span>
+              <span><strong>績效 ${pr}%</strong> NT$ ${pc.toLocaleString()}：${subj.performance.join('、')}</span>
+            </div>
           </div>
         </div>
-        <div class="d-subj">
-          <div class="d-subj-group" style="background:#fff8e1;"><strong style="color:#f39c12;">公司分紅（外加）</strong>${subj.bonus.map(s => `<span>${s}</span>`).join('')}</div>
-          <div class="d-subj-group" style="background:#e8f5e9;"><strong style="color:#27ae60;">其他福利（外加）</strong>${subj.welfare.map(s => `<span>${s}</span>`).join('')}</div>
-          <div class="d-subj-group" style="background:#ffebee;"><strong style="color:#e74c3c;">風險條件</strong>${subj.risks.map(s => `<span>${s}</span>`).join('')}</div>
+        <div class="d-extra">
+          <div class="d-extra-item bonus">公司分紅（外加）：${subj.bonus.join('、')}</div>
+          <div class="d-extra-item welfare">其他福利（外加）：${subj.welfare.join('、')}</div>
+          <div class="d-extra-item risk">風險條件：${subj.risks.join('、')}</div>
         </div>
       </div>
     </div>`;
@@ -122,15 +137,33 @@ window.toggleDept = function(d) {
 };
 
 window.updCfg = function(d, field, value) {
-  if (!deptConfigs[d]) deptConfigs[d] = createDeptConfig(d, parseInt(value) || 600000);
+  if (!deptConfigs[d]) deptConfigs[d] = createDeptConfig(d, 600000);
   const cfg = deptConfigs[d];
+  const v = parseInt(value) || 0;
   if (field === 'total') {
-    cfg.annualTotal = parseInt(value) || 600000;
-    cfg.fixedAnnual = Math.round(cfg.annualTotal * cfg.fixedRatio / 100);
-    cfg.behaviorAnnual = Math.round(cfg.annualTotal * cfg.behaviorRatio / 100);
-    cfg.perfAnnual = Math.round(cfg.annualTotal * cfg.performanceRatio / 100);
-    cfg.monthlyBase = Math.round(cfg.fixedAnnual / 12);
+    cfg.annualTotal = v || 600000;
+  } else if (field === 'fixedPct') {
+    cfg.fixedRatio = Math.min(100, Math.max(0, v));
+    const remain = 100 - cfg.fixedRatio;
+    const totalFloat = cfg.behaviorRatio + cfg.performanceRatio;
+    if (totalFloat > 0) {
+      cfg.behaviorRatio = Math.round(remain * cfg.behaviorRatio / totalFloat);
+      cfg.performanceRatio = remain - cfg.behaviorRatio;
+    } else {
+      cfg.behaviorRatio = Math.round(remain * 0.5);
+      cfg.performanceRatio = remain - cfg.behaviorRatio;
+    }
+  } else if (field === 'behavePct') {
+    cfg.behaviorRatio = Math.min(100 - cfg.fixedRatio, Math.max(0, v));
+    cfg.performanceRatio = 100 - cfg.fixedRatio - cfg.behaviorRatio;
+  } else if (field === 'perfPct') {
+    cfg.performanceRatio = Math.min(100 - cfg.fixedRatio, Math.max(0, v));
+    cfg.behaviorRatio = 100 - cfg.fixedRatio - cfg.performanceRatio;
   }
+  cfg.fixedAnnual = Math.round(cfg.annualTotal * cfg.fixedRatio / 100);
+  cfg.behaviorAnnual = Math.round(cfg.annualTotal * cfg.behaviorRatio / 100);
+  cfg.perfAnnual = Math.round(cfg.annualTotal * cfg.performanceRatio / 100);
+  cfg.monthlyBase = Math.round(cfg.fixedAnnual / 12);
   updateDepts();
 };
 
