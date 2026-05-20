@@ -342,7 +342,10 @@ export function createDefaultAllocation(headcount, deptName, deptType, gradeMatr
   }
 
   const subj = getDeptSubjects(deptName, deptType);
-  const withMonthly = (names, totalMonthly) => names.map((n, i, a) => ({ name: n, monthly: i === a.length - 1 ? totalMonthly - Math.round(totalMonthly / a.length) * (a.length - 1) : Math.round(totalMonthly / a.length) }));
+  const withAnnual = (names, totalAnnual) => names.map((n, i) => ({
+    name: n,
+    annual: i === 0 ? null : Math.round(totalAnnual * (names.length > 1 ? 0.15 / (names.length - 1) : 0)) // first = auto, rest = small share
+  }));
   return tierGrades.map(t => {
     let g = null;
     for (let i = 0; i < grades.length; i++) {
@@ -352,16 +355,14 @@ export function createDefaultAllocation(headcount, deptName, deptType, gradeMatr
     const lvl = g.levels ? g.levels[Math.floor(g.levels.length / 2)] : null;
     const midMonthly = lvl ? Math.round((lvl.min + lvl.max) / 2) : 30000;
     const annualTotal = midMonthly * 14;
-    const fixedM = Math.round(midMonthly * baseRatios.fixed / 100);
-    const behaviorM = Math.round(midMonthly * baseRatios.behavior / 100);
-    const perfM = Math.round(midMonthly * baseRatios.performance / 100);
     return {
       grade: g ? g.grade : -1, level: lvl ? lvl.level : 1, title: g ? g.title : t.label,
       headcount: t.count, annualTotal,
+      fixedRatio: baseRatios.fixed, behaviorRatio: baseRatios.behavior, performanceRatio: baseRatios.performance,
       subjects: {
-        base: withMonthly(subj.base, fixedM),
-        behavior: withMonthly(subj.behavior, behaviorM),
-        performance: withMonthly(subj.performance, perfM)
+        base: withAnnual(subj.base, Math.round(annualTotal * baseRatios.fixed / 100)),
+        behavior: withAnnual(subj.behavior, Math.round(annualTotal * baseRatios.behavior / 100)),
+        performance: withAnnual(subj.performance, Math.round(annualTotal * baseRatios.performance / 100))
       }
     };
   });
