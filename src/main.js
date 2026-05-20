@@ -106,16 +106,25 @@ function calcAllocSummary(alloc) {
 }
 
 function ensureAlloc(d) {
+  if (!d || !d.id) return;
+  if (!data.gradeMatrix) data.gradeMatrix = JSON.parse(JSON.stringify(DEFAULT_GRADE_MATRIX));
   const cfg = data.deptConfigs[d.id];
   if (!cfg) {
-    const pp = getPerPerson(d) * 10000;
+    const totalHC = getTotalHC();
+    const db = totalHC > 0 ? Math.round(getAnnualTotal() * (data.headcounts[d.id] || 0) / totalHC) : 0;
+    const pp = (data.headcounts[d.id] || 0) > 0 ? Math.round(db / (data.headcounts[d.id] || 1)) * 10000 : 600000;
     data.deptConfigs[d.id] = createDeptConfig(d.id, d.name, d.type, pp);
   }
   const cfg2 = data.deptConfigs[d.id];
-  if (cfg2.gradeAllocation) return;
+  if (cfg2.gradeAllocation && cfg2.gradeAllocation.length) return;
   const hc = data.headcounts[d.id] || 0;
   if (hc === 0) return;
-  cfg2.gradeAllocation = createDefaultAllocation(hc, d.name, d.type, data.gradeMatrix || DEFAULT_GRADE_MATRIX);
+  const alloc = createDefaultAllocation(hc, d.name, d.type, data.gradeMatrix);
+  if (alloc && alloc.length) {
+    cfg2.gradeAllocation = alloc;
+  } else {
+    cfg2.gradeAllocation = [{ grade: -1, level: 1, title: d.name + '人員', headcount: hc, annualTotal: 600000, fixedRatio: 70, behaviorRatio: 10, performanceRatio: 20, fixedAnnual: 420000, behaviorAnnual: 60000, perfAnnual: 120000, monthlyBase: 35000, subjects: { base: [{ name: '基本薪資', amount: 420000 }], behavior: [{ name: '獎金', amount: 60000 }], performance: [{ name: '績效', amount: 120000 }] } }];
+  }
   save();
 }
 
