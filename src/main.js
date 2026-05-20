@@ -156,7 +156,7 @@ window.applyBudget = function() {
     if (hc === 0) { delete deptConfigs[d]; return; }
     const deptBudget = totalHC > 0 ? Math.round(annualTotal * hc / totalHC) : 0;
     const perPerson = Math.round(deptBudget / hc);
-    deptConfigs[d] = createDeptConfig(d, perPerson);
+    deptConfigs[d] = createDeptConfig(d, perPerson * 10000);
     if (!selectedDepts.includes(d)) selectedDepts.push(d);
   });
   budget.locked = true;
@@ -201,10 +201,10 @@ function updateDepts() {
       </div>
       <div class="d-body ${checked ? '' : 'hidden'}">
         <div class="d-controls">
-          <div class="d-ctl"><label>年薪總包</label><input type="number" value="${ac}" min="200000" max="5000000" step="10000" oninput="window.updCfg('${d}','total',this.value)"></div>
-          <div class="d-ctl"><label>固定 %</label><input type="number" value="${fr}" min="0" max="100" oninput="window.updCfg('${d}','fixedPct',this.value)"></div>
-          <div class="d-ctl"><label>行為(考核) %</label><input type="number" value="${br}" min="0" max="100" oninput="window.updCfg('${d}','behavePct',this.value)"></div>
-          <div class="d-ctl"><label>績效 %</label><input type="number" value="${pr}" min="0" max="100" oninput="window.updCfg('${d}','perfPct',this.value)"></div>
+          <div class="d-ctl"><label>年薪總包</label><input type="number" value="${ac}" min="200000" max="5000000" step="10000" onchange="window.updCfg('${d}','total',this.value)"></div>
+          <div class="d-ctl"><label>固定 %</label><input type="number" value="${fr}" min="0" max="100" onchange="window.updCfg('${d}','fixedPct',this.value)"></div>
+          <div class="d-ctl"><label>行為(考核) %</label><input type="number" value="${br}" min="0" max="100" onchange="window.updCfg('${d}','behavePct',this.value)"></div>
+          <div class="d-ctl"><label>績效 %</label><input type="number" value="${pr}" min="0" max="100" onchange="window.updCfg('${d}','perfPct',this.value)"></div>
         </div>
         <div class="d-preview">
           <div class="d-panel fixed">
