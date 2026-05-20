@@ -319,6 +319,14 @@ export const DEFAULT_GRADE_MATRIX = {
   ]
 };
 
+// ── 職系預設薪酬組合（固定：變動） ──
+export const FAMILY_PAYMIX = {
+  '管理系': { fixed: 80, float: 20, desc: '以保底底薪為主，強調管理責任' },
+  '業務開發': { fixed: 40, float: 60, desc: '責任底薪+高變動，業績驅動' },
+  '技術研發': { fixed: 70, float: 30, desc: '底薪+職務津貼，保障專業專注度' },
+  '後勤支援': { fixed: 80, float: 20, desc: '底薪+職務加給，重視流程穩定' }
+};
+
 // 向後相容
 export const DEFAULT_GRADES = [
   { level: '實習/工讀', min: 27470, max: 35000 },

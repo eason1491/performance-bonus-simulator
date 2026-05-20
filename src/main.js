@@ -1,5 +1,5 @@
 import { signInWithGoogle, signOut, onAuthChange, getCurrentUser, savePlan as supabaseSave } from './auth.js';
-import { INDUSTRIES, DEPT_TYPE, DEPT_RATIOS, DEPT_SUBJECTS, INDUSTRY_BENCHMARKS, ONE_LINERS, ALL_DEPTS, JOB_TYPES, TYPE_RATIOS, TYPE_SUBJECTS, DEFAULT_GRADES, RANK_TITLES, JOB_FAMILIES, DEFAULT_GRADE_MATRIX, getIndustryDepts, genDeptId, isKnownDept, getDeptRatios, getDeptSubjects, createDeptConfig, calcHealth, parseRange, defaultData } from './data.js';
+import { INDUSTRIES, DEPT_TYPE, DEPT_RATIOS, DEPT_SUBJECTS, INDUSTRY_BENCHMARKS, ONE_LINERS, ALL_DEPTS, JOB_TYPES, TYPE_RATIOS, TYPE_SUBJECTS, DEFAULT_GRADES, RANK_TITLES, JOB_FAMILIES, DEFAULT_GRADE_MATRIX, FAMILY_PAYMIX, getIndustryDepts, genDeptId, isKnownDept, getDeptRatios, getDeptSubjects, createDeptConfig, calcHealth, parseRange, defaultData } from './data.js';
 
 let curUser = null;
 let currentStep = 1;
@@ -405,14 +405,15 @@ function findGradeForSal(salary) {
   const matrix = (data.gradeMatrix && data.gradeMatrix[jf]) || DEFAULT_GRADE_MATRIX['管理系'];
   for (const g of matrix) {
     for (const l of g.levels) {
-      if (salary >= l.min && salary <= l.max) return { grade: g.grade, title: g.title, level: l.level, ok: true };
+      if (salary >= l.min && salary <= l.max) return { grade: g.grade, title: g.title, level: l.level, ok: true, levels: g.levels };
     }
   }
   const last = matrix[matrix.length - 1];
-  const lastMax = last.levels[last.levels.length - 1]?.max || 999999;
+  const lastMax = last ? last.levels[last.levels.length - 1]?.max || 999999 : 999999;
+  const first = matrix[0];
   return salary > lastMax
-    ? { grade: last.grade, title: last.title, level: '↑', ok: false }
-    : { grade: matrix[0].grade, title: matrix[0].title, level: '↓', ok: false };
+    ? { grade: last ? last.grade : 99, title: last ? last.title : '', level: '↑', ok: false }
+    : { grade: first ? first.grade : 0, title: first ? first.title : '', level: '↓', ok: false };
 }
 
 window.updS3 = function(deptId, field, val) {
@@ -652,9 +653,9 @@ window.switchJobFamily = function(f) {
 
 window.updGradeMatrix = function(family, grade, lvlIdx, field, val) {
   if (!data.gradeMatrix) data.gradeMatrix = JSON.parse(JSON.stringify(DEFAULT_GRADE_MATRIX));
-  const entry = data.gradeMatrix[family]?.find(g => g.grade === grade);
+  const entry = data.gradeMatrix[family]?.find(g => Number(g.grade) === Number(grade));
   if (entry && entry.levels[lvlIdx]) {
-    entry.levels[lvlIdx][field] = parseInt(val) || 0;
+    entry.levels[lvlIdx][field] = Math.max(0, parseInt(val) || 0);
     save();
   }
 };
@@ -662,33 +663,110 @@ window.updGradeMatrix = function(family, grade, lvlIdx, field, val) {
 window.showGradeMatrixEditor = function() {
   const jf = data.activeJobFamily || '管理系';
   const matrix = (data.gradeMatrix && data.gradeMatrix[jf]) || DEFAULT_GRADE_MATRIX['管理系'];
+  const pm = FAMILY_PAYMIX[jf] || { fixed: 70, float: 30, desc: '' };
   const bg = document.createElement('div');
   bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;';
   bg.onclick = e => { if (e.target === bg) bg.remove(); };
-  const rows = matrix.map(g => {
-    const lvlHtml = g.levels.map((l, li) => `
-      <tr>
-        <td style="padding:3px 6px;font-size:12px;">${li === 0 ? `<strong>${g.grade}等 ${g.title}</strong>` : ''}</td>
-        <td style="padding:3px 6px;font-size:12px;text-align:center;">${l.level}級</td>
-        <td style="padding:3px 6px;"><input type="number" value="${l.min}" style="width:70px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updGradeMatrix('${jf}',${g.grade},${li},'min',this.value)"></td>
-        <td style="padding:3px 6px;"><input type="number" value="${l.max}" style="width:70px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updGradeMatrix('${jf}',${g.grade},${li},'max',this.value)"></td>
-      </tr>`);
-    return lvlHtml.join('');
+
+  // Build each grade row with levels
+  const gradeHtml = matrix.map((g, gi) => {
+    const width = g.levels[0] ? Math.round((g.levels[0].max - g.levels[0].min) / g.levels[0].min * 100) : 0;
+    const idealWidth = g.grade <= 2 ? '20-30%' : g.grade <= 5 ? '30-40%' : '40-60%';
+    const widthOk = (g.grade <= 2 && width >= 20 && width <= 30) || (g.grade >= 3 && g.grade <= 5 && width >= 30 && width <= 40) || (g.grade >= 6 && width >= 40 && width <= 60);
+    const prev = matrix[gi - 1];
+    const overlap = prev && prev.levels.length && g.levels.length ? Math.round((prev.levels[prev.levels.length - 1].max - g.levels[0].min) / (prev.levels[prev.levels.length - 1].max - prev.levels[prev.levels.length - 1].min) * 100) : 0;
+
+    const lvlHtml = g.levels.map((l, li) => {
+      const lWidth = Math.round((l.max - l.min) / l.min * 100);
+      return `<tr>
+        <td style="padding:2px 6px;font-size:12px;border-bottom:1px solid #f1f5f9;">${li === 0 ? `<input value="${g.title}" style="width:90px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updGradeTitle('${jf}',${g.grade},this.value)">` : ''}</td>
+        <td style="padding:2px 6px;font-size:12px;text-align:center;border-bottom:1px solid #f1f5f9;">${li === 0 ? `<span style="background:#e8eaf6;padding:2px 8px;border-radius:4px;font-weight:600;">${g.grade}等</span>` : ''}</td>
+        <td style="padding:2px 6px;text-align:center;border-bottom:1px solid #f1f5f9;">
+          <input type="number" value="${l.level}" style="width:40px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;" onchange="window.updGradeLevel('${jf}',${g.grade},${li},this.value)">
+        </td>
+        <td style="padding:2px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${l.min}" style="width:65px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updGradeMatrix('${jf}',${g.grade},${li},'min',this.value)"></td>
+        <td style="padding:2px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${l.max}" style="width:65px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updGradeMatrix('${jf}',${g.grade},${li},'max',this.value)"></td>
+        <td style="font-size:11px;color:${widthOk ? '#10b981' : '#f59e0b'};border-bottom:1px solid #f1f5f9;">${lWidth}%</td>
+        <td style="padding:2px 6px;border-bottom:1px solid #f1f5f9;">${li === 0 && g.levels.length > 1 ? `<button class="btn" style="font-size:10px;padding:2px 6px;" onclick="window.addGradeLevel('${jf}',${g.grade})">＋</button>` : ''}${g.levels.length > 1 && li === g.levels.length - 1 ? `<button class="btn" style="font-size:10px;padding:2px 6px;color:#ef4444;margin-left:4px;" onclick="window.delGradeLevel('${jf}',${g.grade},${li})">✕</button>` : ''}</td>
+      </tr>`;
+    }).join('');
+
+    return `<tbody style="border-bottom:2px solid #e2e8f0;">
+      ${lvlHtml}
+      <tr style="background:#f8fafc;">
+        <td colspan="7" style="padding:2px 8px;font-size:11px;color:#64748b;">
+          薪資寬帶 ${width}% ${widthOk ? '✅ 建議' : '⚠ 建議'} ${idealWidth}
+          ${prev ? ` · 與${prev.grade}等重疊度 ${overlap}% ${overlap >= 20 && overlap <= 50 ? '✅' : '⚠ 建議20-50%'}` : ''}
+          ${gi === matrix.length - 1 ? `<button class="btn" style="font-size:10px;padding:2px 8px;margin-left:8px;" onclick="window.addGradeRow('${jf}')">＋ 新增職等</button>` : ''}
+          <button class="btn" style="font-size:10px;padding:2px 8px;color:#ef4444;margin-left:4px;" onclick="window.delGradeRow('${jf}',${g.grade})">✕ 刪除</button>
+        </td>
+      </tr>
+    </tbody>`;
   }).join('');
-  bg.innerHTML = `<div style="background:#fff;border-radius:12px;padding:28px;min-width:500px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);" onclick="event.stopPropagation()">
-    <h3 style="margin-bottom:8px;font-size:16px;font-weight:700;">編輯職等職級級距 — ${jf}</h3>
-    <p style="font-size:12px;color:#64748b;margin-bottom:16px;">職等（責任權限）· 職級（熟練度）。調整各級距薪資範圍，部門月固定薪會自動重新對應。</p>
-    <table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr><th style="text-align:left;padding:4px 6px;border-bottom:2px solid #e2e8f0;">職等</th><th style="padding:4px 6px;border-bottom:2px solid #e2e8f0;">職級</th><th style="padding:4px 6px;border-bottom:2px solid #e2e8f0;">下限</th><th style="padding:4px 6px;border-bottom:2px solid #e2e8f0;">上限</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div style="margin-top:16px;display:flex;gap:8px;justify-content:space-between;">
-      <div style="display:flex;gap:8px;">
-        <button class="btn" onclick="window.addGradeRow('${jf}')">＋ 新增職等</button>
+
+  bg.innerHTML = `<div style="background:#fff;border-radius:12px;padding:24px;min-width:700px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <h3 style="font-size:16px;font-weight:700;">📊 職等職級對照表</h3>
+      <div style="display:flex;gap:6px;align-items:center;">
+        ${JOB_FAMILIES.map(f => `<button class="chip ${f === jf ? 'active' : ''}" style="font-size:12px;padding:4px 12px;" onclick="window.switchJobFamilyEditor('${f}')">${f}</button>`).join('')}
       </div>
+    </div>
+    <div style="background:#f0f9ff;padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:12px;color:#1e40af;">
+      <strong>${jf}</strong>：${pm.desc} · 固定 ${pm.fixed}%／浮動 ${pm.float}% · 薪資寬帶建議：基層20-30%、中階30-40%、高階40-60%
+    </div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="border-bottom:2px solid #1e293b;">
+        <th style="text-align:left;padding:4px 6px;font-size:12px;">職稱</th>
+        <th style="padding:4px 6px;font-size:12px;">職等</th>
+        <th style="padding:4px 6px;font-size:12px;">職級</th>
+        <th style="padding:4px 6px;font-size:12px;">下限</th>
+        <th style="padding:4px 6px;font-size:12px;">上限</th>
+        <th style="padding:4px 6px;font-size:12px;">寬帶%</th>
+        <th style="padding:4px 6px;font-size:12px;"></th>
+      </tr></thead>
+      ${gradeHtml}
+    </table>
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:space-between;align-items:center;">
+      <button class="btn" onclick="window.addJobFamily()">＋ 新增職系</button>
       <button class="btn-primary" onclick="this.closest('div[style]').parentElement.remove();save();render();">完成</button>
     </div>
   </div>`;
   document.body.appendChild(bg);
+};
+
+window.switchJobFamilyEditor = function(f) {
+  data.activeJobFamily = f;
+  save();
+  window.showGradeMatrixEditor();
+};
+
+window.updGradeTitle = function(family, grade, val) {
+  if (!data.gradeMatrix) return;
+  const entry = data.gradeMatrix[family]?.find(g => Number(g.grade) === Number(grade));
+  if (entry) { entry.title = val; save(); }
+};
+
+window.updGradeLevel = function(family, grade, idx, val) {
+  if (!data.gradeMatrix) return;
+  const entry = data.gradeMatrix[family]?.find(g => Number(g.grade) === Number(grade));
+  if (entry && entry.levels[idx]) { entry.levels[idx].level = Math.max(0, parseInt(val) || 0); save(); }
+};
+
+window.addGradeLevel = function(family, grade) {
+  if (!data.gradeMatrix) data.gradeMatrix = JSON.parse(JSON.stringify(DEFAULT_GRADE_MATRIX));
+  const entry = data.gradeMatrix[family]?.find(g => Number(g.grade) === Number(grade));
+  if (entry) {
+    const last = entry.levels[entry.levels.length - 1] || { min: 30000, max: 35000 };
+    entry.levels.push({ level: (last.level || 0) + 1, min: last.min + 2000, max: last.max + 3000 });
+    save();
+    window.showGradeMatrixEditor();
+  }
+};
+
+window.delGradeLevel = function(family, grade, idx) {
+  if (!data.gradeMatrix) return;
+  const entry = data.gradeMatrix[family]?.find(g => Number(g.grade) === Number(grade));
+  if (entry && entry.levels.length > 1) { entry.levels.splice(idx, 1); save(); window.showGradeMatrixEditor(); }
 };
 
 window.addGradeRow = function(family) {
@@ -697,10 +775,29 @@ window.addGradeRow = function(family) {
   if (arr) {
     const last = arr[arr.length - 1];
     const newGrade = last ? last.grade + 1 : 0;
-    arr.push({ grade: newGrade, title: `職等${newGrade}`, levels: [{ level: 1, min: 30000, max: 40000 }, { level: 2, min: 35000, max: 45000 }, { level: 3, min: 40000, max: 50000 }] });
+    arr.push({ grade: newGrade, title: `職等${newGrade}`, levels: [{ level: 1, min: 30000, max: 35000 }, { level: 2, min: 35000, max: 40000 }] });
     save();
     window.showGradeMatrixEditor();
   }
+};
+
+window.delGradeRow = function(family, grade) {
+  if (!data.gradeMatrix || data.gradeMatrix[family].length <= 1) return;
+  if (!confirm(`確定刪除 ${grade} 等？`)) return;
+  data.gradeMatrix[family] = data.gradeMatrix[family].filter(g => Number(g.grade) !== Number(grade));
+  save();
+  window.showGradeMatrixEditor();
+};
+
+window.addJobFamily = function() {
+  const name = prompt('新職系名稱：');
+  if (!name) return;
+  if (!data.gradeMatrix) data.gradeMatrix = JSON.parse(JSON.stringify(DEFAULT_GRADE_MATRIX));
+  if (data.gradeMatrix[name]) { alert('職系已存在'); return; }
+  data.gradeMatrix[name] = JSON.parse(JSON.stringify(DEFAULT_GRADE_MATRIX['管理系']));
+  data.activeJobFamily = name;
+  save();
+  window.showGradeMatrixEditor();
 };
 
 // ── Old grade functions (keep for backward compat) ──
