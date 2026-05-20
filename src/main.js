@@ -107,10 +107,15 @@ function calcAllocSummary(alloc) {
 
 function ensureAlloc(d) {
   const cfg = data.deptConfigs[d.id];
-  if (!cfg || cfg.gradeAllocation) return;
+  if (!cfg) {
+    const pp = getPerPerson(d) * 10000;
+    data.deptConfigs[d.id] = createDeptConfig(d.id, d.name, d.type, pp);
+  }
+  const cfg2 = data.deptConfigs[d.id];
+  if (cfg2.gradeAllocation) return;
   const hc = data.headcounts[d.id] || 0;
   if (hc === 0) return;
-  cfg.gradeAllocation = createDefaultAllocation(hc, d.name, d.type, data.gradeMatrix || DEFAULT_GRADE_MATRIX);
+  cfg2.gradeAllocation = createDefaultAllocation(hc, d.name, d.type, data.gradeMatrix || DEFAULT_GRADE_MATRIX);
   save();
 }
 
