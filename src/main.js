@@ -102,6 +102,7 @@ function getDeptBudget(d) {
 }
 
 function calcAllocRow(a) {
+  if (!a || typeof a !== 'object') { console.warn('calcAllocRow: invalid input', a); return emptyRow(); }
   const an = Number(a.annualTotal) || 1;
   const fr = a.fixedRatio !== undefined ? Number(a.fixedRatio) : 40;
   const br = a.behaviorRatio !== undefined ? Number(a.behaviorRatio) : 10;
@@ -112,8 +113,8 @@ function calcAllocRow(a) {
 
   const calcCat = (cat, target) => {
     const items = (a.subjects?.[cat] || []);
-    const autoIdx = items.findIndex(s => s.annual === null);
-    const others = items.reduce((s, item, i) => s + (i !== autoIdx ? (Number(item.annual) || 0) : 0), 0);
+    const autoIdx = items.findIndex(s => s && s.annual === null);
+    const others = items.reduce((s, item, i) => s + (i !== autoIdx && item ? (Number(item.annual) || 0) : 0), 0);
     const autoVal = target - others;
     return { target, others, autoVal, autoIdx, error: autoVal < 0, items };
   };
@@ -133,9 +134,11 @@ function calcAllocRow(a) {
     annualTotal,
     over: annualTotal - an,
     baseCat, behaviorCat, performanceCat,
-    anyError: baseCat.error || behavCat.error || perfCat.error
+    anyError: baseCat.error || behaviorCat.error || performanceCat.error
   };
 }
+
+function emptyRow() { return { fr:0, br:0, pr:0, targetBase:0, targetBehav:0, targetPerf:0, monthlyBase:0, monthlyBehavior:0, monthlyPerf:0, monthlyTotal:0, annualTotal:0, over:0, baseCat:{ target:0, others:0, autoVal:0, autoIdx:-1, error:false, items:[] }, behaviorCat:{ target:0, others:0, autoVal:0, autoIdx:-1, error:false, items:[] }, performanceCat:{ target:0, others:0, autoVal:0, autoIdx:-1, error:false, items:[] }, anyError:false }; }
 
 function calcAllocSummary(alloc) {
   let totalHC = 0, totalAnnual = 0;
@@ -183,11 +186,12 @@ function renderSteps() {
 }
 
 window.goStep = function(n) {
+  console.log('goStep called:', n, 'currentStep:', currentStep, 'totalHC:', getTotalHC());
   if (n < 1 || n > 5) return;
-  if (n > currentStep + 1 && currentStep < 5) return;
+  if (n > currentStep + 1 && currentStep < 5) { console.log('Step blocked: too far ahead'); return; }
   currentStep = n;
   save();
-  render();
+  try { render(); } catch(e) { console.error('render error:', e); }
 };
 
 function renderStepContent() {
@@ -360,6 +364,15 @@ function initSortDrag() {
 
 // ── Step 3: Structure with Grade Allocation ──
 function step3HTML() {
+  try {
+    return _step3HTML();
+  } catch(e) {
+    console.error('step3HTML error:', e);
+    return `<div class="scard"><div class="scard-title">❸ 薪酬結構設計</div><div class="empty">初始化錯誤：${e.message}。請按 F12 查看 Console 錯誤訊息。</div><button class="btn" onclick="window.goStep(2)" style="margin-top:12px;">‹ 返回配置部門</button></div>`;
+  }
+}
+
+function _step3HTML() {
   const depts = getDepts();
   let cards = depts.map(d => {
     const hc = data.headcounts[d.id] || 0;
