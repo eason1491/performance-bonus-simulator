@@ -7,6 +7,7 @@ let currentUser = null;
 let selectedIndustry = null;
 let selectedDepts = [];
 let deptConfigs = {};
+let budget = { monthlyRevenue: 500, laborRatio: 25, headcounts: {}, locked: false };
 
 onAuthChange((event, user) => {
   if (user) {
@@ -51,6 +52,96 @@ window.pickIndustry = function(ind) {
   renderIndustries();
   selectedDepts = [...INDUSTRIES[ind]];
   deptConfigs = {};
+  budget = { monthlyRevenue: 500, laborRatio: 25, headcounts: {}, locked: false };
+  renderBudgetPlanner();
+  updateDepts();
+};
+
+// ── Budget Planner ──
+function parseRatioRange(str) {
+  if (!str) return { min: 20, max: 40 };
+  const m = str.match(/([\d.]+)\s*-\s*([\d.]+)/);
+  return m ? { min: parseFloat(m[1]), max: parseFloat(m[2]) } : { min: 20, max: 40 };
+}
+
+function renderBudgetPlanner() {
+  const el = document.getElementById('budgetPlanner');
+  if (!selectedIndustry) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+
+  const bench = INDUSTRY_BENCHMARKS[selectedIndustry];
+  const range = parseRatioRange(bench ? bench.laborRate : '20%-40%');
+  const mid = Math.round((range.min + range.max) / 2);
+  if (!budget.locked) budget.laborRatio = mid;
+
+  const depts = INDUSTRIES[selectedIndustry];
+  const annualTotal = budget.monthlyRevenue * 12 * budget.laborRatio / 100;
+  const defaultShare = Math.round(100 / depts.length);
+  let deptRows = depts.map((d, i) => {
+    const hc = budget.headcounts[d] || 3;
+    const share = i < depts.length - 1 ? defaultShare : 100 - defaultShare * (depts.length - 1);
+    const deptBudget = Math.round(annualTotal * share / 100);
+    return `<div class="bp-dept">
+      <span class="bp-dname">${d}</span>
+      <input type="number" value="${hc}" min="1" max="200" oninput="window.updBudgetHeadcount('${d}',this.value)">
+      <span style="font-size:12px;color:#90a4ae;">人</span>
+      <span class="bp-dbudget">NT$${(deptBudget/10000).toFixed(0)}萬</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="bp-title">
+      📊 預算規劃
+      <span class="toggle" onclick="this.parentElement.nextElementSibling.classList.toggle('hidden')">收合</span>
+    </div>
+    <div id="bpBody">
+      <div class="bp-row">
+        <div class="bp-field"><label>月營業額目標（萬）</label><input type="number" value="${budget.monthlyRevenue}" min="10" max="999999" oninput="window.updBudget('revenue',this.value)"></div>
+        <div class="bp-field"><label>人事成本比例 %（建議 ${range.min}%-${range.max}%）</label><input type="number" value="${budget.laborRatio}" min="1" max="100" step="0.5" oninput="window.updBudget('ratio',this.value)"></div>
+        <div class="bp-field" style="display:flex;align-items:flex-end;gap:8px;">
+          <button class="bp-apply" onclick="window.applyBudget()">套用至部門</button>
+          <button class="btn" onclick="window.resetBudget()">重設</button>
+        </div>
+      </div>
+      <div class="bp-total">年人事總預算 <strong>NT$ ${(annualTotal/10000).toFixed(0)} 萬</strong> <small>（月均 NT$ ${(annualTotal/12/10000).toFixed(0)} 萬）</small></div>
+      <div class="bp-depts">${deptRows}</div>
+      <div class="bp-hint">💡 調整各部門人數後，系統自動按比例分配預算。點「套用至部門」將預算寫入部門卡片。</div>
+    </div>`;
+}
+
+window.updBudget = function(field, val) {
+  if (field === 'revenue') budget.monthlyRevenue = parseFloat(val) || 500;
+  if (field === 'ratio') budget.laborRatio = parseFloat(val) || 25;
+  renderBudgetPlanner();
+};
+
+window.updBudgetHeadcount = function(dept, val) {
+  budget.headcounts[dept] = parseInt(val) || 1;
+  renderBudgetPlanner();
+};
+
+window.resetBudget = function() {
+  budget = { monthlyRevenue: 500, laborRatio: 25, headcounts: {}, locked: false };
+  deptConfigs = {};
+  renderBudgetPlanner();
+  updateDepts();
+};
+
+window.applyBudget = function() {
+  const depts = INDUSTRIES[selectedIndustry];
+  const annualTotal = budget.monthlyRevenue * 12 * budget.laborRatio / 100;
+  const defaultShare = Math.round(100 / depts.length);
+
+  depts.forEach((d, i) => {
+    const hc = budget.headcounts[d] || 3;
+    const share = i < depts.length - 1 ? defaultShare : 100 - defaultShare * (depts.length - 1);
+    const deptBudget = Math.round(annualTotal * share / 100);
+    const perPerson = Math.round(deptBudget / hc);
+    deptConfigs[d] = createDeptConfig(d, perPerson);
+    if (!selectedDepts.includes(d)) selectedDepts.push(d);
+  });
+  budget.locked = true;
+  renderBudgetPlanner();
   updateDepts();
 };
 
