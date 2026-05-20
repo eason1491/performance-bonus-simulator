@@ -96,20 +96,20 @@ function getOrCreateConfig(d, pp) {
 
 // ── Step Indicator ──
 function renderSteps() {
-  const labels = ['設定總預算', '配置部門人數', '薪酬結構設計', '總覽報表'];
-  const states = ['pending','pending','pending','pending'];
+  const labels = ['設定總預算', '配置部門人數', '薪酬結構設計', '職等職級對照', '總覽報表'];
+  const states = ['pending','pending','pending','pending','pending'];
   for (let i = 0; i < currentStep; i++) states[i] = 'done';
   states[currentStep - 1] = 'active';
   document.getElementById('stepIndicator').innerHTML = states.map((s, i) => {
     const n = i + 1;
-    const icons = ['❶','❷','❸','❹'];
+    const icons = ['❶','❷','❸','❹','❺'];
     return `${i > 0 ? '<span class="step-arrow">›</span>' : ''}<div class="step ${s}" onclick="window.goStep(${n})" style="cursor:pointer;"><div class="step-num">${icons[i]}</div><div class="step-label">${labels[i]}</div></div>`;
   }).join('');
 }
 
 window.goStep = function(n) {
-  if (n < 1 || n > 4) return;
-  if (n > currentStep + 1 && currentStep < 4) return;
+  if (n < 1 || n > 5) return;
+  if (n > currentStep + 1 && currentStep < 5) return;
   currentStep = n;
   save();
   render();
@@ -122,6 +122,7 @@ function renderStepContent() {
   else if (currentStep === 2) el.innerHTML = step2HTML();
   else if (currentStep === 3) el.innerHTML = step3HTML();
   else if (currentStep === 4) el.innerHTML = step4HTML();
+  else if (currentStep === 5) el.innerHTML = step5HTML();
   attachStepEvents();
 }
 
@@ -391,7 +392,7 @@ function step3HTML() {
     <div class="scard-title">❸ 薪酬結構設計</div>
     <div class="scard-desc">調整各部門固定／行為考核／績效比例，金額即時連動。拖曳卡片可調整部門順序。點「編輯科目」可自訂考核細項。</div>
     <div id="strDeptList">${cards || '<div class="empty">尚無部門可配置</div>'}</div>
-  </div>${stepNav('下一步：總覽報表 ›', true)}`;
+  </div>${stepNav('下一步：職等職級對照 ›', true)}`;
 }
 
 function getPerPerson(d) {
@@ -523,10 +524,54 @@ window.delSubjItem = function(deptId, cat, idx) {
   if (cfg && cfg.subjects[cat]) { cfg.subjects[cat].splice(idx, 1); save(); window.showSubjectsEditor(deptId); }
 };
 
-// ── Step 4: Report + Salary Grades + Multi-month Comparison ──
+// ── Step 4: Grade Matrix ──
 function step4HTML() {
   const depts = getDepts();
   const active = depts.filter(d => data.deptConfigs[d.id] && (data.headcounts[d.id] || 0) > 0);
+  const jf = data.activeJobFamily || '管理系';
+  const famRow = JOB_FAMILIES.map(f =>
+    `<button class="chip ${f === jf ? 'active' : ''}" style="font-size:12px;padding:4px 12px;" onclick="window.switchJobFamily('${f}')">${f}</button>`
+  ).join('');
+  const pm = FAMILY_PAYMIX[jf] || { fixed: 70, float: 30, desc: '' };
+
+  const deptGradeRows = active.map(d => {
+    const cfg = data.deptConfigs[d.id];
+    const sal = cfg.monthlyBase;
+    const r = findGradeForSal(sal);
+    const bg = r.ok ? '#f0fdf4' : '#fef2f2';
+    const cl = r.ok ? '#166534' : '#991b1b';
+    const label = r.ok ? `${r.title} ${r.grade}等${r.level}級` : (r.level === '↑' ? '⚠ 高於最高級距' : '⚠ 低於最低級距');
+    return `<tr style="background:${bg};">
+      <td><strong>${d.name}</strong></td>
+      <td class="r">NT$ ${sal.toLocaleString()}</td>
+      <td style="color:${cl};font-weight:600;">${label}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="scard">
+    <div class="scard-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>❹ 職等職級對照</span>
+      <button class="btn" onclick="window.showGradeMatrixEditor()">✏ 編輯級距表</button>
+    </div>
+    <div class="scard-desc">
+      <strong>職等</strong>（Grade）= 責任權限 · <strong>職級</strong>（Step）= 熟練度。<br>
+      各部門月固定薪自動對應職等職級。綠底=符合級距，紅底=超出範圍。
+      可切換職系查看不同薪資結構與固定/變動比例。點「編輯級距表」可增刪職等職級、調整薪資範圍。
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <span style="font-size:12px;color:#64748b;">職系：</span>${famRow}
+      <span style="font-size:11px;color:#1e40af;background:#eff6ff;padding:3px 8px;border-radius:4px;">固定 ${pm.fixed}% · 浮動 ${pm.float}% · ${pm.desc}</span>
+    </div>
+    ${deptGradeRows.length ? `<table class="r-table" style="font-size:13px;"><thead><tr><th>部門</th><th class="r">月固定薪</th><th>對應職等職級</th></tr></thead>
+      <tbody>${deptGradeRows}</tbody></table>` : '<div class="empty">尚無部門資料</div>'}
+  </div>${stepNav('下一步：總覽報表 ›', true)}`;
+}
+
+// ── Step 5: Report ──
+function step5HTML() {
+  const depts = getDepts();
+  const active = depts.filter(d => data.deptConfigs[d.id] && (data.headcounts[d.id] || 0) > 0);
+  if (active.length === 0) return `<div class="scard"><div class="scard-title">❺ 總覽報表</div><div class="empty">尚無資料</div></div>`;
 
   let totalF = 0, totalB = 0, totalP = 0, grand = 0;
   let rows = active.map(d => {
@@ -548,26 +593,6 @@ function step4HTML() {
   const bench = INDUSTRY_BENCHMARKS[data.industry];
   const health = calcHealth(data.laborRatio, bench);
 
-  // Grade summary — department-centric view
-  const jf = data.activeJobFamily || '管理系';
-  const famRow = JOB_FAMILIES.map(f =>
-    `<button class="chip ${f === jf ? 'active' : ''}" style="font-size:12px;padding:4px 12px;" onclick="window.switchJobFamily('${f}')">${f}</button>`
-  ).join('');
-  const deptGradeRows = active.map(d => {
-    const cfg = data.deptConfigs[d.id];
-    const sal = cfg.monthlyBase;
-    const r = findGradeForSal(sal);
-    const bg = r.ok ? '#f0fdf4' : '#fef2f2';
-    const cl = r.ok ? '#166534' : '#991b1b';
-    const label = r.ok ? `${r.title} ${r.grade}等${r.level}級` : (r.level === '↑' ? '⚠ 高於最高級距' : '⚠ 低於最低級距');
-    return `<tr style="background:${bg};">
-      <td><strong>${d.name}</strong></td>
-      <td class="r">NT$ ${sal.toLocaleString()}</td>
-      <td style="color:${cl};font-weight:600;">${label}</td>
-    </tr>`;
-  }).join('');
-
-  // Multi-month comparison (saved snapshots)
   let snapRows = '';
   const snapshots = getSnapshots();
   if (snapshots.length > 0) {
@@ -585,7 +610,7 @@ function step4HTML() {
 
   return `<div class="scard">
     <div class="scard-title" style="display:flex;align-items:center;justify-content:space-between;">
-      <span>❹ 總覽報表</span>
+      <span>❺ 總覽報表</span>
       <div>
         <button class="btn" onclick="window.saveSnapshot()">📸 存檔比較</button>
         <button class="btn" onclick="window.exportExcel()">📥 Excel 匯出</button>
@@ -598,26 +623,7 @@ function step4HTML() {
         <td class="r"><strong>NT$ ${getTotalHC() > 0 ? Math.round(grand/getTotalHC()).toLocaleString() : 0}</strong></td><td class="r"><strong>NT$ ${grand.toLocaleString()}</strong></td></tr>
       </tbody></table>
     <div class="r-health" style="border-left-color:${health.color};color:${health.color};background:${health.bg}">${health.text} — ${data.industry} 建議 ${bench ? bench.laborRate : '—'}，目前設定 ${data.laborRatio}%，佔用 ${usedPct}%${bench && bench.note ? `<br><span style="font-weight:400;font-size:11px;">${bench.note}</span>` : ''}</div>
-  </div>
-
-  <!-- Grade Mapping -->
-  <div class="scard">
-    <div class="scard-title" style="display:flex;align-items:center;justify-content:space-between;">
-      <span>📊 職等職級對照</span>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:11px;color:#64748b;">職系：</span>
-        ${famRow}
-        <button class="btn" style="font-size:11px;" onclick="window.showGradeMatrixEditor()">✏ 編輯級距</button>
-      </div>
-    </div>
-    <div class="scard-desc">各部門月固定薪對應之職等（責任權限）與職級（熟練度）。綠底=符合級距，紅底=超出範圍。</div>
-    <table class="r-table" style="font-size:13px;"><thead><tr><th>部門</th><th class="r">月固定薪</th><th>對應職等職級</th></tr></thead>
-      <tbody>${deptGradeRows}</tbody>
-    </table>
-  </div>
-  </div>
-
-  ${snapRows}`;
+  </div>${snapRows}`;
 }
 
 // ── Snapshots (multi-month comparison) ──
