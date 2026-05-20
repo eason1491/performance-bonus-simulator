@@ -147,7 +147,7 @@ function step1HTML() {
       <div class="b1-field"><label>人事成本比例 %（${data.industry} 建議 ${bench ? bench.laborRate : '20%-40%'}）</label><input type="number" id="s1ratio" value="${data.laborRatio}" min="1" max="100" step="0.5" onchange="window.updS1('ratio',this.value)"></div>
     </div>
     <div class="b1-total">年人事總預算 <strong>NT$ ${at.toLocaleString()} 萬</strong> <small>（月均 NT$ ${(at/12).toLocaleString()} 萬）</small></div>
-    <div class="b1-suggest">${bench ? `💡 ${data.industry} 業界參考：人事成本 ${bench.laborRate}，毛利率 ${bench.grossMargin}` : ''}</div>
+    <div class="b1-suggest">${bench ? `💡 ${data.industry} 業界參考：人事成本 ${bench.laborRate}，毛利率 ${bench.grossMargin}${bench.note ? `（${bench.note}）` : ''}` : ''}</div>
   </div>${stepNav('下一步：配置部門 ›', data.industry && data.laborRatio > 0)}`;
 }
 
@@ -569,7 +569,7 @@ function step4HTML() {
         <td class="r"><strong>NT$ ${totalF.toLocaleString()}</strong></td><td class="r"><strong>NT$ ${totalB.toLocaleString()}</strong></td><td class="r"><strong>NT$ ${totalP.toLocaleString()}</strong></td>
         <td class="r"><strong>NT$ ${getTotalHC() > 0 ? Math.round(grand/getTotalHC()).toLocaleString() : 0}</strong></td><td class="r"><strong>NT$ ${grand.toLocaleString()}</strong></td></tr>
       </tbody></table>
-    <div class="r-health" style="border-left-color:${health.color};color:${health.color};background:${health.bg}">${health.text} — ${data.industry} 建議 ${bench ? bench.laborRate : '—'}，目前設定 ${data.laborRatio}%，佔用 ${usedPct}%</div>
+    <div class="r-health" style="border-left-color:${health.color};color:${health.color};background:${health.bg}">${health.text} — ${data.industry} 建議 ${bench ? bench.laborRate : '—'}，目前設定 ${data.laborRatio}%，佔用 ${usedPct}%${bench && bench.note ? `<br><span style="font-weight:400;font-size:11px;">${bench.note}</span>` : ''}</div>
   </div>
 
   <!-- Salary Grades -->
@@ -666,7 +666,7 @@ function renderSidebar() {
     <div class="sbo-bar"><div class="sbo-bar-fill ${barClass}" style="width:${pct}%"></div></div>
     <div class="sbo-bar-label">${pct}% ${barLabel}</div>
     ${deptLines}
-    <div class="sbo-health" style="background:${health.bg};color:${health.color};">${health.text} — ${data.industry} 建議 ${bench ? bench.laborRate : '—'}，目前 ${data.laborRatio}%</div>
+    <div class="sbo-health" style="background:${health.bg};color:${health.color};">${health.text} — ${data.industry} 建議 ${bench ? bench.laborRate : '—'}，目前 ${data.laborRatio}%${bench && bench.note ? `<br><span style="font-weight:400;font-size:11px;">${bench.note}</span>` : ''}</div>
   </div>`;
 }
 

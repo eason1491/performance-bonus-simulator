@@ -126,7 +126,7 @@ export const DEPT_SUBJECTS = {
 
 export const INDUSTRY_BENCHMARKS = {
   '科技/軟體/電商':     { laborRate: '30%-50%', grossMargin: '70%-90%' },
-  '製造業（含代工）':    { laborRate: '5%-15%', grossMargin: '5%-20%' },
+  '製造業（含代工）':    { laborRate: '5%-25%', grossMargin: '5%-20%', note: 'OEM純代工5-15%｜ODM設計代工15-25%' },
   '餐飲業':            { laborRate: '20%-25%', grossMargin: '60%-70%' },
   '零售/服務業':        { laborRate: '10%-15%', grossMargin: '15%-40%' },
   '金融/保險/證券':     { laborRate: '62%-64%', grossMargin: '極高' },
