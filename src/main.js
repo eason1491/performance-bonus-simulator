@@ -349,16 +349,20 @@ function step3HTML() {
       };
 
       return `<div style="border-bottom:1px solid #f1f5f9;">
-        <div class="alloc-summary" style="display:grid;grid-template-columns:30px 120px 50px 110px 55px 55px 55px 50px auto;align-items:center;gap:4px;padding:6px 8px;font-size:13px;cursor:pointer;" onclick="window.toggleAlloc('${d.id}',${ai})">
-          <span style="color:#94a3b8;font-size:12px;">${isOpen ? '▾' : '▸'}</span>
-          <select onchange="window.updAllocCell('${d.id}',${ai},'grade',this.value);event.stopPropagation();" style="font-size:12px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:4px;width:110px;" onclick="event.stopPropagation()">${titleOptions}</select>
-          <input type="number" value="${a.headcount}" min="1" max="99" style="width:40px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;" onchange="window.updAllocCell('${d.id}',${ai},'hc',this.value);event.stopPropagation();" onclick="event.stopPropagation()">
-          <input type="number" value="${a.annualTotal}" step="10000" min="100000" max="5000000" style="width:100px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updAllocCell('${d.id}',${ai},'annual',this.value);event.stopPropagation();" onclick="event.stopPropagation()">
-          <input type="number" value="${a.fixedRatio}" min="0" max="100" style="width:45px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;" onchange="window.updAllocCell('${d.id}',${ai},'fr',this.value);event.stopPropagation();" onclick="event.stopPropagation()">
-          <input type="number" value="${a.behaviorRatio}" min="0" max="100" style="width:45px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;" onchange="window.updAllocCell('${d.id}',${ai},'br',this.value);event.stopPropagation();" onclick="event.stopPropagation()">
-          <input type="number" value="${a.performanceRatio}" min="0" max="100" style="width:45px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;" onchange="window.updAllocCell('${d.id}',${ai},'pr',this.value);event.stopPropagation();" onclick="event.stopPropagation()">
-          <span style="font-size:12px;text-align:right;">NT$ ${(a.annualTotal * a.headcount).toLocaleString()}</span>
-          ${ai > 0 ? `<button class="btn" style="font-size:9px;padding:0 6px;color:#ef4444;" onclick="window.delAllocRow('${d.id}',${ai});event.stopPropagation();">✕</button>` : '<span></span>'}
+        <div class="alloc-summary" style="padding:8px 12px;cursor:pointer;" onclick="window.toggleAlloc('${d.id}',${ai})">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="color:#94a3b8;font-size:14px;">${isOpen ? '▾' : '▸'}</span>
+            <select onchange="window.updAllocCell('${d.id}',${ai},'grade',this.value);event.stopPropagation();" style="font-size:13px;font-weight:600;padding:2px 6px;border:1px solid #e2e8f0;border-radius:4px;" onclick="event.stopPropagation()">${titleOptions}</select>
+            <span style="font-size:13px;color:#475569;min-width:50px;">${a.headcount}人</span>
+            <span style="margin-left:auto;font-size:12px;color:#64748b;">年薪總包 NT$ ${a.annualTotal.toLocaleString()}／人</span>
+            ${ai > 0 ? `<button class="btn" style="font-size:10px;padding:1px 8px;color:#ef4444;" onclick="window.delAllocRow('${d.id}',${ai});event.stopPropagation();">✕</button>` : ''}
+          </div>
+          <div style="display:flex;gap:16px;margin-top:4px;margin-left:22px;font-size:12px;flex-wrap:wrap;">
+            <span><strong style="color:#1a237e;">固定${a.fixedRatio}%</strong> NT$ ${a.fixedAnnual.toLocaleString()}</span>
+            <span><strong style="color:#e65100;">行為${a.behaviorRatio}%</strong> NT$ ${a.behaviorAnnual.toLocaleString()}</span>
+            <span><strong style="color:#2e7d32;">績效${a.performanceRatio}%</strong> NT$ ${a.perfAnnual.toLocaleString()}</span>
+            <span style="margin-left:auto;font-weight:600;">小計 NT$ ${(a.annualTotal * a.headcount).toLocaleString()}</span>
+          </div>
         </div>
         ${isOpen ? `<div class="alloc-detail" style="background:#fafbff;padding:8px 12px 8px 42px;font-size:12px;">
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
@@ -367,7 +371,7 @@ function step3HTML() {
               const catVal = { base: a.fixedAnnual, behavior: a.behaviorAnnual, performance: a.perfAnnual }[cat];
               const items = (a.subjects && a.subjects[cat]) || [];
               return `<div>
-                <div style="font-weight:600;color:#475569;margin-bottom:4px;font-size:11px;">${catLabel} NT$ ${catVal.toLocaleString()}</div>
+                <div style="font-weight:600;color:#475569;margin-bottom:4px;font-size:11px;">${catLabel}</div>
                 ${items.map((s, si) => `<div style="display:flex;align-items:center;gap:4px;margin:2px 0;">
                   <input value="${s.name}" style="width:70px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:3px;font-size:11px;" onchange="window.updAllocSubj('${d.id}',${ai},'${cat}',${si},'name',this.value)">
                   <input type="number" value="${s.amount}" style="width:60px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:3px;font-size:11px;" onchange="window.updAllocSubj('${d.id}',${ai},'${cat}',${si},'amount',this.value)">
@@ -377,23 +381,19 @@ function step3HTML() {
               </div>`;
             }).join('')}
           </div>
-          <div style="display:flex;gap:8px;margin-top:6px;">
-            <span style="font-size:10px;color:#94a3b8;">月固定 NT$ ${a.monthlyBase.toLocaleString()}／人</span>
-            <span style="font-size:10px;color:#94a3b8;">固定+行為+績效合計 $${(a.fixedRatio + a.behaviorRatio + a.performanceRatio)}%</span>
-          </div>
+          <div style="margin-top:6px;font-size:10px;color:#94a3b8;">月固定 NT$ ${a.monthlyBase.toLocaleString()}／人</div>
         </div>` : ''}
       </div>`;
     }).join('');
 
-    const totRow = summary.totalHC > 0 ? `<div style="display:grid;grid-template-columns:30px 120px 50px 110px 55px 55px 55px 50px auto;align-items:center;gap:4px;padding:8px;font-size:13px;font-weight:700;background:#f8fafc;border-top:2px solid #0f172a;">
-      <span></span><span>合計</span>
-      <span style="text-align:center;">${summary.totalHC}</span>
-      <span></span>
-      <span style="text-align:center;">${summary.fr}%</span>
-      <span style="text-align:center;">${summary.br}%</span>
-      <span style="text-align:center;">${summary.pr}%</span>
-      <span style="text-align:right;">NT$ ${summary.deptTotal.toLocaleString()}</span>
-      <span></span>
+    const totRow = summary.totalHC > 0 ? `<div style="padding:10px 12px;font-size:13px;font-weight:700;background:#f8fafc;border-top:2px solid #0f172a;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <span>合計 <strong>${summary.totalHC}人</strong></span>
+        <span>固定${summary.fr}% NT$ ${summary.totalF.toLocaleString()}</span>
+        <span>行為${summary.br}% NT$ ${summary.totalB.toLocaleString()}</span>
+        <span>績效${summary.pr}% NT$ ${summary.totalP.toLocaleString()}</span>
+        <span style="color:#1a237e;">總計 NT$ ${summary.deptTotal.toLocaleString()}</span>
+      </div>
     </div>` : '';
 
     return `<div class="str-card" data-dept-id="${d.id}" style="border-color:${borderColor};${usage > 100 ? 'box-shadow:0 0 0 2px #ef4444;' : ''}">
@@ -406,9 +406,6 @@ function step3HTML() {
         <span style="font-size:12px;font-weight:600;color:${usgColor};">${usgLabel} ${usage}%</span>
       </div>
       <div class="str-body" style="padding:0;">
-        <div style="display:grid;grid-template-columns:30px 120px 50px 110px 55px 55px 55px 50px auto;align-items:center;gap:4px;padding:6px 8px;font-size:11px;color:#64748b;background:#fafbff;border-bottom:1px solid #e2e8f0;">
-          <span></span><span>職稱</span><span style="text-align:center;">人</span><span>年薪總包</span><span style="text-align:center;">固定%</span><span style="text-align:center;">行為%</span><span style="text-align:center;">績效%</span><span style="text-align:right;">小計</span>
-        </div>
         ${allocRows}
         ${totRow}
         <div style="display:flex;gap:8px;padding:8px;border-top:1px solid #e2e8f0;">
