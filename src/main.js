@@ -114,13 +114,16 @@ function calcAllocRow(a) {
 }
 
 function calcAllocSummary(alloc) {
-  let totalHC = 0, totalAnnual = 0;
+  let totalHC = 0, totalAnnual = 0, totalF = 0, totalB = 0, totalP = 0;
   (alloc || []).forEach(a => {
     const r = calcAllocRow(a);
     totalHC += a.headcount || 0;
     totalAnnual += r.annualTotal * (a.headcount || 0);
+    totalF += r.annualBase * (a.headcount || 0);
+    totalB += r.annualBehavior * (a.headcount || 0);
+    totalP += r.annualPerf * (a.headcount || 0);
   });
-  return { totalHC, deptTotal: totalAnnual, totalAnnual };
+  return { totalHC, deptTotal: totalAnnual, totalAnnual, totalF, totalB, totalP };
 }
 
 function ensureAlloc(d) {
@@ -539,6 +542,7 @@ window.updAllocSubj = function(deptId, idx, cat, si, val) {
   if (!alloc || !alloc[idx] || !alloc[idx].subjects || !alloc[idx].subjects[cat]) return;
   alloc[idx].subjects[cat][si].monthly = Math.max(0, parseInt(val) || 0);
   save();
+  renderStepContent();
 };
 
 window.addAllocSubj = function(deptId, idx, cat, name) {
