@@ -201,7 +201,7 @@ function step2HTML() {
     const tClass = d.type === '上山型' ? 'up' : d.type === '平路型' ? 'flat' : 'down';
     return `<tr data-dept-id="${d.id}">
       <td><span style="color:#94a3b8;margin-right:6px;user-select:none;">⠿</span><strong>${d.name}</strong> <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:${tClass==='up'?'#e3f2fd':tClass==='flat'?'#f3e5f5':'#e0f2fe'};color:#1e293b;">${d.type}</span></td>
-      <td><input type="number" value="${hc}" min="0" max="500" onchange="window.updS2HC('${d.id}',this.value)" style="width:64px;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:14px;text-align:center;"></td>
+      <td><input type="number" value="${hc}" min="0" max="9999" onchange="window.updS2HC('${d.id}',this.value)" style="width:64px;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:14px;text-align:center;"></td>
       <td class="r">${hc > 0 ? `NT$ ${db.toLocaleString()} 萬` : '—'}</td>
       <td class="r">${hc > 0 ? `${pct}%` : '—'}</td>
     </tr>`;
@@ -353,7 +353,9 @@ function step3HTML() {
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <span style="color:#94a3b8;font-size:14px;">${isOpen ? '▾' : '▸'}</span>
             <select onchange="window.updAllocCell('${d.id}',${ai},'grade',this.value);event.stopPropagation();" style="font-size:13px;font-weight:600;padding:2px 6px;border:1px solid #e2e8f0;border-radius:4px;" onclick="event.stopPropagation()">${titleOptions}</select>
-            <span style="font-size:13px;color:#475569;min-width:50px;">${a.headcount}人</span>
+            <span style="font-size:13px;color:#475569;">
+              <input type="number" value="${a.headcount}" min="0" max="999" style="width:50px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:13px;text-align:center;" onchange="window.updAllocCell('${d.id}',${ai},'hc',this.value);event.stopPropagation();" onclick="event.stopPropagation()">人
+            </span>
             <span style="margin-left:auto;font-size:12px;color:#64748b;">年薪總包 NT$ ${a.annualTotal.toLocaleString()}／人</span>
             ${ai > 0 ? `<button class="btn" style="font-size:10px;padding:1px 8px;color:#ef4444;" onclick="window.delAllocRow('${d.id}',${ai});event.stopPropagation();">✕</button>` : ''}
           </div>
@@ -467,7 +469,7 @@ window.updAllocCell = function(deptId, idx, field, val) {
       a.title = g.title;
       a.level = g.levels[Math.floor(g.levels.length / 2)]?.level || 1;
     }
-  } else if (field === 'hc') { a.headcount = Math.max(1, num); }
+  } else if (field === 'hc') { a.headcount = Math.min(999, Math.max(0, num)); }
   else if (field === 'annual') { a.annualTotal = Math.max(100000, num); }
   else if (field === 'fr') {
     a.fixedRatio = Math.min(100, Math.max(0, num));

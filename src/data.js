@@ -308,36 +308,51 @@ export function createDefaultAllocation(headcount, deptName, deptType, gradeMatr
   if (!grades.length || headcount <= 0) return [];
   const typeRatios = { '上山型': { fixed: 40, behavior: 10, performance: 50 }, '平路型': { fixed: 80, behavior: 10, performance: 10 }, '下山型': { fixed: 70, behavior: 10, performance: 20 } };
   const baseRatios = typeRatios[deptType] || typeRatios['平路型'];
-  let tiers = [];
+
+  // 固定金字塔：依部門人數決定各層級對應的職等 grade 值
+  let tierGrades;
   if (headcount <= 3) {
-    if (headcount >= 1) tiers.push({ label: '管理層', offset: -2, count: 1 });
-    if (headcount >= 2) tiers.push({ label: '資深', offset: -1, count: 1 });
-    if (headcount >= 3) tiers.push({ label: '基層員工', offset: 0, count: headcount - 2 });
+    tierGrades = [
+      { label: '管理層', grade: 4, count: 1 },
+      { label: '資深', grade: 2, count: Math.min(1, headcount - 1) },
+      { label: '基層員工', grade: 1, count: headcount - 1 - Math.min(1, headcount - 1) }
+    ];
+    if (headcount === 1) tierGrades = [{ label: '人員', grade: 2, count: 1 }];
+    if (headcount === 2) tierGrades = [{ label: '資深', grade: 3, count: 1 }, { label: '基層員工', grade: 1, count: 1 }];
   } else if (headcount <= 8) {
-    tiers = [
-      { label: '管理層', offset: -3, count: 1 },
-      { label: '中階', offset: -2, count: Math.max(1, Math.round(headcount * 0.2)) },
-      { label: '基層主管', offset: -1, count: Math.max(1, Math.round(headcount * 0.3)) },
-      { label: '基層員工', offset: 0, count: headcount }
+    const mid = Math.max(1, Math.round(headcount * 0.2));
+    const lead = Math.max(1, Math.round(headcount * 0.3));
+    const entry = Math.max(1, headcount - 1 - mid - lead);
+    tierGrades = [
+      { label: '管理層', grade: 5, count: 1 },
+      { label: '中階', grade: 4, count: mid },
+      { label: '基層主管', grade: 2, count: lead },
+      { label: '基層員工', grade: 1, count: entry }
     ];
-    tiers[3].count = Math.max(1, headcount - tiers.slice(0, 3).reduce((s, t) => s + t.count, 0));
   } else {
-    tiers = [
-      { label: '管理層', offset: -3, count: 1 },
-      { label: '中階', offset: -2, count: Math.max(2, Math.round(headcount * 0.15)) },
-      { label: '基層主管', offset: -1, count: Math.max(3, Math.round(headcount * 0.25)) },
-      { label: '基層員工', offset: 0, count: headcount }
+    const mid = Math.max(2, Math.round(headcount * 0.15));
+    const lead = Math.max(3, Math.round(headcount * 0.25));
+    const entry = Math.max(1, headcount - 1 - mid - lead);
+    tierGrades = [
+      { label: '管理層', grade: 6, count: 1 },
+      { label: '中階', grade: 4, count: mid },
+      { label: '基層主管', grade: 3, count: lead },
+      { label: '基層員工', grade: 1, count: entry }
     ];
-    tiers[3].count = Math.max(1, headcount - tiers.slice(0, 3).reduce((s, t) => s + t.count, 0));
   }
+
   const subj = getDeptSubjects(deptName, deptType);
   const withAmounts = (names, total) => names.map((n, i, a) => ({ name: n, amount: i === a.length - 1 ? total - Math.round(total / a.length) * (a.length - 1) : Math.round(total / a.length) }));
-  return tiers.map(t => {
-    const idx = t.offset < 0 ? Math.max(0, grades.length + t.offset) : Math.min(t.offset, grades.length - 1);
-    const g = grades[Math.min(idx, grades.length - 1)];
-    const lvl = g ? g.levels[Math.floor(g.levels.length / 2)] : null;
+  return tierGrades.map(t => {
+    // 找到 grade 表中第一個 >= t.grade 的職等
+    let g = null;
+    for (let i = 0; i < grades.length; i++) {
+      if (grades[i].grade >= t.grade) { g = grades[i]; break; }
+    }
+    if (!g) g = grades[grades.length - 1] || grades[0];
+    const lvl = g.levels ? g.levels[Math.floor(g.levels.length / 2)] : null;
     const midMonthly = lvl ? Math.round((lvl.min + lvl.max) / 2) : 30000;
-    const annualTotal = midMonthly * 14; // 12 months + 2 months bonus
+    const annualTotal = midMonthly * 14;
     const fixedAnnual = Math.round(annualTotal * baseRatios.fixed / 100);
     const behaviorAnnual = Math.round(annualTotal * baseRatios.behavior / 100);
     const perfAnnual = Math.round(annualTotal * baseRatios.performance / 100);
