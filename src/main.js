@@ -1,5 +1,5 @@
 import { signInWithGoogle, signOut, onAuthChange, getCurrentUser, savePlan as supabaseSave } from './auth.js';
-import { INDUSTRIES, DEPT_TYPE, DEPT_RATIOS, DEPT_SUBJECTS, INDUSTRY_BENCHMARKS, ONE_LINERS, ALL_DEPTS, JOB_TYPES, TYPE_RATIOS, TYPE_SUBJECTS, DEFAULT_GRADES, getIndustryDepts, genDeptId, isKnownDept, getDeptRatios, getDeptSubjects, createDeptConfig, calcHealth, parseRange, defaultData } from './data.js';
+import { INDUSTRIES, DEPT_TYPE, DEPT_RATIOS, DEPT_SUBJECTS, INDUSTRY_BENCHMARKS, ONE_LINERS, ALL_DEPTS, JOB_TYPES, TYPE_RATIOS, TYPE_SUBJECTS, DEFAULT_GRADES, RANK_TITLES, JOB_FAMILIES, DEFAULT_GRADE_MATRIX, getIndustryDepts, genDeptId, isKnownDept, getDeptRatios, getDeptSubjects, createDeptConfig, calcHealth, parseRange, defaultData } from './data.js';
 
 let curUser = null;
 let currentStep = 1;
@@ -530,14 +530,23 @@ function step4HTML() {
   const bench = INDUSTRY_BENCHMARKS[data.industry];
   const health = calcHealth(data.laborRatio, bench);
 
-  // Salary grades
-  const grades = data.grades && data.grades.length ? data.grades : DEFAULT_GRADES;
-  const gradeRows = grades.map((g, i) =>
-    `<tr><td><input value="${g.level}" style="width:100px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;" onchange="window.updGrade(${i},'level',this.value)"></td>
-    <td><input type="number" value="${g.min}" style="width:80px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;" onchange="window.updGrade(${i},'min',this.value)"></td>
-    <td><input type="number" value="${g.max}" style="width:80px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;" onchange="window.updGrade(${i},'max',this.value)"></td>
-    <td><button class="btn" style="font-size:11px;color:#ef4444;" onclick="window.delGrade(${i})">✕</button></td></tr>`
+  // Salary grades — 職等×職級 matrix
+  const jf = data.activeJobFamily || '管理系';
+  const matrix = (data.gradeMatrix && data.gradeMatrix[jf]) || DEFAULT_GRADE_MATRIX['管理系'];
+  const famRow = JOB_FAMILIES.map(f =>
+    `<button class="chip ${f === jf ? 'active' : ''}" style="font-size:12px;padding:4px 12px;" onclick="window.switchJobFamily('${f}')">${f}</button>`
   ).join('');
+  const gradeRows = matrix.map(g => {
+    const lvlRows = g.levels.map((l, li) => `
+      <tr>
+        <td style="padding:4px 8px;font-size:12px;color:#64748b;">${li === 0 ? `<strong>${g.title}</strong>` : ''}</td>
+        <td style="padding:4px 8px;font-size:12px;text-align:center;">${li === 0 ? `<span style="background:#e8eaf6;padding:2px 8px;border-radius:4px;font-weight:600;">${g.grade}等</span>` : ''}</td>
+        <td style="padding:4px 8px;font-size:12px;text-align:center;">${l.level}級</td>
+        <td style="padding:4px 8px;"><input type="number" value="${l.min}" style="width:80px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updGradeMatrix('${jf}',${g.grade},${li},'min',this.value)"></td>
+        <td style="padding:4px 8px;"><input type="number" value="${l.max}" style="width:80px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updGradeMatrix('${jf}',${g.grade},${li},'max',this.value)"></td>
+      </tr>`);
+    return lvlRows.join('');
+  }).join('');
 
   // Multi-month comparison (saved snapshots)
   let snapRows = '';
@@ -572,14 +581,17 @@ function step4HTML() {
     <div class="r-health" style="border-left-color:${health.color};color:${health.color};background:${health.bg}">${health.text} — ${data.industry} 建議 ${bench ? bench.laborRate : '—'}，目前設定 ${data.laborRatio}%，佔用 ${usedPct}%${bench && bench.note ? `<br><span style="font-weight:400;font-size:11px;">${bench.note}</span>` : ''}</div>
   </div>
 
-  <!-- Salary Grades -->
+  <!-- Grade Matrix -->
   <div class="scard">
     <div class="scard-title" style="display:flex;align-items:center;justify-content:space-between;">
-      <span>📊 薪資級距對照</span>
-      <button class="btn" onclick="window.addGrade()">＋ 新增級距</button>
+      <span>📊 職等職級對照表</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:11px;color:#64748b;">職系：</span>
+        ${famRow}
+      </div>
     </div>
-    <div class="scard-desc">各部門月固定薪應對照級距範圍，確保內部公平性。</div>
-    <table class="r-table" style="font-size:13px;"><thead><tr><th>職等</th><th>下限</th><th>上限</th><th></th></tr></thead>
+    <div class="scard-desc">職等（Grade）= 責任權限 • 職級（Step）= 熟練度 • 各職系薪資結構不同，可切換檢視。月固定薪應對照所屬職等職級範圍。</div>
+    <table class="r-table" style="font-size:12px;"><thead><tr><th style="width:25%;">職稱</th><th style="width:60px;">職等</th><th style="width:50px;">職級</th><th>下限</th><th>上限</th></tr></thead>
       <tbody>${gradeRows}</tbody>
     </table>
   </div>
@@ -610,7 +622,24 @@ window.saveSnapshot = function() {
   renderStepContent();
 };
 
-// ── Grade management ──
+// ── Grade Matrix Management ──
+window.switchJobFamily = function(f) {
+  if (!data.gradeMatrix) data.gradeMatrix = JSON.parse(JSON.stringify(DEFAULT_GRADE_MATRIX));
+  data.activeJobFamily = f;
+  save();
+  renderStepContent();
+};
+
+window.updGradeMatrix = function(family, grade, lvlIdx, field, val) {
+  if (!data.gradeMatrix) data.gradeMatrix = JSON.parse(JSON.stringify(DEFAULT_GRADE_MATRIX));
+  const entry = data.gradeMatrix[family]?.find(g => g.grade === grade);
+  if (entry && entry.levels[lvlIdx]) {
+    entry.levels[lvlIdx][field] = parseInt(val) || 0;
+    save();
+  }
+};
+
+// ── Old grade functions (keep for backward compat) ──
 window.updGrade = function(i, field, val) {
   if (!data.grades) data.grades = JSON.parse(JSON.stringify(DEFAULT_GRADES));
   if (field === 'level') data.grades[i].level = val;

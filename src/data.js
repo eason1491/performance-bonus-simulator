@@ -255,7 +255,71 @@ export function createDeptConfig(deptId, name, type, annualTotal) {
   };
 }
 
-// ── 預設薪資級距 ──
+// ── 預設職等職級對照（職等=責任，職級=熟練度） ──
+export const RANK_TITLES = {
+  0: '試用期', 1: '助理', 2: '專員', 3: '副課長', 4: '課長',
+  5: '副理', 6: '經理', 7: '資深經理', 8: '協理', 9: '副總經理', 10: '總經理'
+};
+
+export const JOB_FAMILIES = ['管理系', '業務開發', '技術研發', '後勤支援'];
+
+// 預設各職系之職等職級薪資對照 (from 04薪資職等職級對照表ver2.0.pdf)
+export const DEFAULT_GRADE_MATRIX = {
+  '管理系': [
+    { grade: 0, title: '試用期人員', levels: [{ level: 0, min: 28000, max: 30000 }] },
+    { grade: 1, title: '助理', levels: [{ level: 1, min: 30000, max: 31000 }, { level: 2, min: 30500, max: 32000 }, { level: 3, min: 31000, max: 33000 }] },
+    { grade: 2, title: '專員', levels: [{ level: 1, min: 32000, max: 35000 }, { level: 2, min: 33000, max: 36000 }, { level: 3, min: 34000, max: 37000 }] },
+    { grade: 3, title: '副課長', levels: [{ level: 1, min: 35000, max: 38000 }, { level: 2, min: 36000, max: 39000 }, { level: 3, min: 37000, max: 40000 }] },
+    { grade: 4, title: '課長', levels: [{ level: 1, min: 38000, max: 41000 }, { level: 2, min: 39000, max: 42000 }, { level: 3, min: 40000, max: 43000 }] },
+    { grade: 5, title: '副理', levels: [{ level: 1, min: 38000, max: 40000 }, { level: 2, min: 39000, max: 41000 }, { level: 3, min: 40000, max: 42000 }] },
+    { grade: 6, title: '經理', levels: [{ level: 1, min: 41000, max: 43000 }, { level: 2, min: 42000, max: 45000 }, { level: 3, min: 43000, max: 47000 }] },
+    { grade: 7, title: '資深經理', levels: [{ level: 1, min: 44000, max: 47000 }, { level: 2, min: 45000, max: 48000 }, { level: 3, min: 46000, max: 49000 }] },
+    { grade: 8, title: '協理', levels: [{ level: 1, min: 47000, max: 55000 }, { level: 2, min: 48000, max: 58000 }, { level: 3, min: 49000, max: 60000 }] },
+    { grade: 9, title: '副總經理', levels: [{ level: 1, min: 50000, max: 65000 }, { level: 2, min: 55000, max: 75000 }, { level: 3, min: 60000, max: 80000 }] },
+    { grade: 10, title: '總經理', levels: [{ level: 1, min: 70000, max: 85000 }, { level: 2, min: 80000, max: 95000 }, { level: 3, min: 90000, max: 120000 }] }
+  ],
+  '業務開發': [
+    { grade: 0, title: '試用期人員', levels: [{ level: 0, min: 28000, max: 30000 }] },
+    { grade: 1, title: '助理', levels: [{ level: 1, min: 28000, max: 30500 }, { level: 2, min: 29000, max: 31500 }, { level: 3, min: 30000, max: 32500 }] },
+    { grade: 2, title: '專員', levels: [{ level: 1, min: 30000, max: 34000 }, { level: 2, min: 31000, max: 35500 }, { level: 3, min: 32000, max: 37000 }] },
+    { grade: 3, title: '高級專員', levels: [{ level: 1, min: 33000, max: 37000 }, { level: 2, min: 34000, max: 38500 }, { level: 3, min: 35000, max: 40000 }] },
+    { grade: 4, title: '資深專員', levels: [{ level: 1, min: 36000, max: 40000 }, { level: 2, min: 37000, max: 42000 }, { level: 3, min: 38000, max: 43000 }] },
+    { grade: 5, title: '業務副理', levels: [{ level: 1, min: 38000, max: 43000 }, { level: 2, min: 39000, max: 45000 }, { level: 3, min: 40000, max: 46000 }] },
+    { grade: 6, title: '業務經理', levels: [{ level: 1, min: 40000, max: 46000 }, { level: 2, min: 41000, max: 48000 }, { level: 3, min: 42000, max: 50000 }] },
+    { grade: 7, title: '資深業務經理', levels: [{ level: 1, min: 44000, max: 51000 }, { level: 2, min: 45000, max: 53000 }, { level: 3, min: 46000, max: 55000 }] },
+    { grade: 8, title: '業務協理', levels: [{ level: 1, min: 48000, max: 58000 }, { level: 2, min: 50000, max: 62000 }, { level: 3, min: 52000, max: 65000 }] },
+    { grade: 9, title: '業務副總', levels: [{ level: 1, min: 55000, max: 70000 }, { level: 2, min: 60000, max: 80000 }, { level: 3, min: 65000, max: 90000 }] },
+    { grade: 10, title: '總經理', levels: [{ level: 1, min: 70000, max: 85000 }, { level: 2, min: 80000, max: 95000 }, { level: 3, min: 90000, max: 120000 }] }
+  ],
+  '技術研發': [
+    { grade: 0, title: '試用期人員', levels: [{ level: 0, min: 28000, max: 30000 }] },
+    { grade: 1, title: '助理工程師', levels: [{ level: 1, min: 29000, max: 32000 }, { level: 2, min: 29500, max: 33000 }, { level: 3, min: 30000, max: 34000 }] },
+    { grade: 2, title: '初級工程師', levels: [{ level: 1, min: 31000, max: 35000 }, { level: 2, min: 32000, max: 36500 }, { level: 3, min: 33000, max: 38000 }] },
+    { grade: 3, title: '中級工程師', levels: [{ level: 1, min: 34000, max: 39000 }, { level: 2, min: 35000, max: 40500 }, { level: 3, min: 36000, max: 42000 }] },
+    { grade: 4, title: '高級工程師', levels: [{ level: 1, min: 37000, max: 43000 }, { level: 2, min: 38000, max: 45000 }, { level: 3, min: 39000, max: 47000 }] },
+    { grade: 5, title: '資深工程師', levels: [{ level: 1, min: 40000, max: 48000 }, { level: 2, min: 42000, max: 50000 }, { level: 3, min: 44000, max: 52000 }] },
+    { grade: 6, title: '專業經理', levels: [{ level: 1, min: 45000, max: 53000 }, { level: 2, min: 47000, max: 56000 }, { level: 3, min: 49000, max: 58000 }] },
+    { grade: 7, title: '資深專業經理', levels: [{ level: 1, min: 50000, max: 59000 }, { level: 2, min: 52000, max: 62000 }, { level: 3, min: 54000, max: 65000 }] },
+    { grade: 8, title: '專業協理', levels: [{ level: 1, min: 55000, max: 66000 }, { level: 2, min: 57000, max: 70000 }, { level: 3, min: 60000, max: 75000 }] },
+    { grade: 9, title: '總工程師', levels: [{ level: 1, min: 65000, max: 80000 }, { level: 2, min: 70000, max: 90000 }, { level: 3, min: 75000, max: 100000 }] },
+    { grade: 10, title: '總經理', levels: [{ level: 1, min: 70000, max: 85000 }, { level: 2, min: 80000, max: 95000 }, { level: 3, min: 90000, max: 120000 }] }
+  ],
+  '後勤支援': [
+    { grade: 0, title: '試用期人員', levels: [{ level: 0, min: 28000, max: 30000 }] },
+    { grade: 1, title: '助理', levels: [{ level: 1, min: 28000, max: 31000 }, { level: 2, min: 28500, max: 32000 }, { level: 3, min: 29000, max: 33000 }] },
+    { grade: 2, title: '專員', levels: [{ level: 1, min: 30000, max: 34000 }, { level: 2, min: 31000, max: 35500 }, { level: 3, min: 32000, max: 37000 }] },
+    { grade: 3, title: '高級專員', levels: [{ level: 1, min: 33000, max: 37000 }, { level: 2, min: 34000, max: 38500 }, { level: 3, min: 35000, max: 40000 }] },
+    { grade: 4, title: '資深專員', levels: [{ level: 1, min: 36000, max: 40000 }, { level: 2, min: 37000, max: 42000 }, { level: 3, min: 38000, max: 43000 }] },
+    { grade: 5, title: '專業副理', levels: [{ level: 1, min: 38000, max: 43000 }, { level: 2, min: 39000, max: 45000 }, { level: 3, min: 40000, max: 46000 }] },
+    { grade: 6, title: '專業經理', levels: [{ level: 1, min: 40000, max: 46000 }, { level: 2, min: 41000, max: 48000 }, { level: 3, min: 42000, max: 50000 }] },
+    { grade: 7, title: '資深專業經理', levels: [{ level: 1, min: 44000, max: 51000 }, { level: 2, min: 45000, max: 53000 }, { level: 3, min: 46000, max: 55000 }] },
+    { grade: 8, title: '專業協理', levels: [{ level: 1, min: 48000, max: 58000 }, { level: 2, min: 50000, max: 62000 }, { level: 3, min: 52000, max: 65000 }] },
+    { grade: 9, title: '副總經理', levels: [{ level: 1, min: 55000, max: 70000 }, { level: 2, min: 60000, max: 80000 }, { level: 3, min: 65000, max: 90000 }] },
+    { grade: 10, title: '總經理', levels: [{ level: 1, min: 70000, max: 85000 }, { level: 2, min: 80000, max: 95000 }, { level: 3, min: 90000, max: 120000 }] }
+  ]
+};
+
+// 向後相容
 export const DEFAULT_GRADES = [
   { level: '實習/工讀', min: 27470, max: 35000 },
   { level: '助理',      min: 30000, max: 40000 },
@@ -301,6 +365,8 @@ export function defaultData(ind) {
     headcounts: hc,
     deptConfigs: {},
     grades: JSON.parse(JSON.stringify(DEFAULT_GRADES)),
+    gradeMatrix: JSON.parse(JSON.stringify(DEFAULT_GRADE_MATRIX)),
+    activeJobFamily: '管理系',
     step: 1,
     planName: '未命名方案',
     planId: null
