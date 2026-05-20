@@ -17,6 +17,7 @@ onAuthChange((event, user) => {
     document.getElementById('userName').textContent = user.user_metadata?.full_name || user.email;
     document.getElementById('userAvatar').src = user.user_metadata?.avatar_url || '';
     initApp();
+    showTutorial();
   } else {
     currentUser = null;
     document.getElementById('login-screen').classList.remove('hidden');
@@ -32,6 +33,7 @@ getCurrentUser().then(user => {
     document.getElementById('userName').textContent = user.user_metadata?.full_name || user.email;
     document.getElementById('userAvatar').src = user.user_metadata?.avatar_url || '';
     initApp();
+    showTutorial();
   }
 });
 
@@ -491,3 +493,52 @@ window.exportComparisonCSV = function() {
     exportComparisonCSV(window._comparisonResults, window._comparisonNames);
   }
 };
+
+// ── Tutorial ──
+const tutorialSteps = [
+  { title: '歡迎使用獎金模擬器', desc: '這是一個幫你設計薪酬方案的工具。左側邊欄管理方案，中間填數據，右邊看結果。我們用 5 步驟帶你走一遍。' },
+  { title: '1️⃣ 輸入基本資料', desc: '在「基本設定」填入底薪、預期獎金、法定成本。再到「業績目標」輸入年度目標和實際達成。這些是計算的基礎。' },
+  { title: '2️⃣ 設定階梯門檻', desc: '「階梯門檻設定」可以自由增減業績區間。每個區間設定一個門檻（萬）和提撥率（%）。提撥率應由低到高遞增。' },
+  { title: '3️⃣ 甜蜜點與封頂', desc: '「甜蜜點」是績效的最佳區間，超過後提撥率會降低。獎金上限設為 0 表示不封頂。按「計算獎金」看右邊結果。' },
+  { title: '4️⃣ 儲存與比較', desc: '上方工具列可「儲存」方案到雲端。存多個方案後按「比較」可以並排對比。還可以匯出 CSV 或 PDF。' }
+];
+let tutorialStep = 0;
+
+function showTutorial() {
+  const overlay = document.getElementById('tutorialOverlay');
+  if (!overlay || localStorage.getItem('tutorialDone')) return;
+  overlay.classList.remove('hidden');
+  tutorialStep = 0;
+  renderTutorialStep();
+}
+
+function renderTutorialStep() {
+  const step = tutorialSteps[tutorialStep];
+  document.getElementById('tutorialStep').textContent = `步驟 ${tutorialStep + 1} / ${tutorialSteps.length}`;
+  document.getElementById('tutorialTitle').textContent = step.title;
+  document.getElementById('tutorialDesc').textContent = step.desc;
+  document.getElementById('tutorialPrev').style.display = tutorialStep === 0 ? 'none' : '';
+  document.getElementById('tutorialNext').textContent = tutorialStep === tutorialSteps.length - 1 ? '開始使用' : '下一步';
+}
+
+document.getElementById('tutorialNext')?.addEventListener('click', function() {
+  if (tutorialStep < tutorialSteps.length - 1) {
+    tutorialStep++;
+    renderTutorialStep();
+  } else {
+    document.getElementById('tutorialOverlay').classList.add('hidden');
+    localStorage.setItem('tutorialDone', '1');
+  }
+});
+
+document.getElementById('tutorialPrev')?.addEventListener('click', function() {
+  if (tutorialStep > 0) {
+    tutorialStep--;
+    renderTutorialStep();
+  }
+});
+
+document.getElementById('tutorialSkip')?.addEventListener('click', function() {
+  document.getElementById('tutorialOverlay').classList.add('hidden');
+  localStorage.setItem('tutorialDone', '1');
+});
