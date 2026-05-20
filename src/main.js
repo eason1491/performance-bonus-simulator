@@ -82,7 +82,7 @@ function renderBudgetPlanner() {
     const hc = budget.headcounts[d] || 3;
     return `<div class="bp-dept">
       <span class="bp-dname">${d}</span>
-      <input type="number" value="${hc}" min="1" max="200" onchange="window.updBudgetHeadcount('${d}',this.value)">
+      <input type="number" value="${hc}" min="0" max="200" onchange="window.updBudgetHeadcount('${d}',this.value)">
       <span style="font-size:12px;color:#90a4ae;">人</span>
       <span class="bp-dbudget" id="bd-${d}"></span>
     </div>`;
@@ -113,16 +113,17 @@ function updateBudgetDisplay() {
   const depts = INDUSTRIES[selectedIndustry];
   if (!depts) return;
   const annualTotal = budget.monthlyRevenue * 12 * budget.laborRatio / 100;
-  const defaultShare = Math.round(100 / depts.length);
   const totalEl = document.getElementById('bpTotal');
   const monthEl = document.getElementById('bpMonthly');
   if (totalEl) totalEl.textContent = `NT$ ${annualTotal.toLocaleString()} 萬`;
   if (monthEl) monthEl.textContent = `（月均 NT$ ${(annualTotal / 12).toLocaleString()} 萬）`;
-  depts.forEach((d, i) => {
-    const share = i < depts.length - 1 ? defaultShare : 100 - defaultShare * (depts.length - 1);
-    const deptBudget = Math.round(annualTotal * share / 100);
+
+  const totalHC = depts.reduce((s, d) => s + (budget.headcounts[d] || 0), 0);
+  depts.forEach(d => {
+    const hc = budget.headcounts[d] || 0;
+    const deptBudget = totalHC > 0 ? Math.round(annualTotal * hc / totalHC) : 0;
     const bdEl = document.getElementById(`bd-${d}`);
-    if (bdEl) bdEl.textContent = `NT$${deptBudget.toLocaleString()}萬`;
+    if (bdEl) bdEl.textContent = hc > 0 ? `NT$${deptBudget.toLocaleString()}萬` : '—';
   });
 }
 
@@ -147,12 +148,12 @@ window.resetBudget = function() {
 window.applyBudget = function() {
   const depts = INDUSTRIES[selectedIndustry];
   const annualTotal = budget.monthlyRevenue * 12 * budget.laborRatio / 100;
-  const defaultShare = Math.round(100 / depts.length);
+  const totalHC = depts.reduce((s, d) => s + (budget.headcounts[d] || 0), 0);
 
-  depts.forEach((d, i) => {
-    const hc = budget.headcounts[d] || 3;
-    const share = i < depts.length - 1 ? defaultShare : 100 - defaultShare * (depts.length - 1);
-    const deptBudget = Math.round(annualTotal * share / 100);
+  depts.forEach(d => {
+    const hc = budget.headcounts[d] || 0;
+    if (hc === 0) { delete deptConfigs[d]; return; }
+    const deptBudget = totalHC > 0 ? Math.round(annualTotal * hc / totalHC) : 0;
     const perPerson = Math.round(deptBudget / hc);
     deptConfigs[d] = createDeptConfig(d, perPerson);
     if (!selectedDepts.includes(d)) selectedDepts.push(d);
