@@ -530,21 +530,48 @@ function step4HTML() {
   const bench = INDUSTRY_BENCHMARKS[data.industry];
   const health = calcHealth(data.laborRatio, bench);
 
-  // Salary grades — 職等×職級 matrix
+  // Salary grades — 職等×職級 matrix with department mapping
   const jf = data.activeJobFamily || '管理系';
   const matrix = (data.gradeMatrix && data.gradeMatrix[jf]) || DEFAULT_GRADE_MATRIX['管理系'];
   const famRow = JOB_FAMILIES.map(f =>
     `<button class="chip ${f === jf ? 'active' : ''}" style="font-size:12px;padding:4px 12px;" onclick="window.switchJobFamily('${f}')">${f}</button>`
   ).join('');
+
+  // Map each dept's monthly base salary to grade/level
+  const deptMarkers = [];
+  active.forEach(d => {
+    const cfg = data.deptConfigs[d.id];
+    const sal = cfg.monthlyBase;
+    let found = null;
+    for (const g of matrix) {
+      for (const l of g.levels) {
+        if (sal >= l.min && sal <= l.max) { found = { grade: g.grade, level: l.level }; break; }
+      }
+      if (found) break;
+    }
+    if (!found) {
+      const last = matrix[matrix.length - 1];
+      found = sal > (last.levels[last.levels.length - 1]?.max || 999999) ? { grade: last.grade + 1, level: '↑' } : { grade: 0, level: '↓' };
+    }
+    deptMarkers.push({ name: d.name, sal, grade: found.grade, level: found.level });
+  });
+
+  // Check if any dept is outside range
+  const outsideRange = deptMarkers.filter(m => m.level === '↑' || m.level === '↓');
+
   const gradeRows = matrix.map(g => {
-    const lvlRows = g.levels.map((l, li) => `
-      <tr>
-        <td style="padding:4px 8px;font-size:12px;color:#64748b;">${li === 0 ? `<strong>${g.title}</strong>` : ''}</td>
+    const lvlRows = g.levels.map((l, li) => {
+      const markers = deptMarkers.filter(m => m.grade === g.grade && m.level === l.level);
+      const markerHtml = markers.length ? `<span style="display:block;font-size:10px;color:#6366f1;margin-top:2px;">← ${markers.map(m => m.name).join('、')}</span>` : '';
+      return `<tr>
+        <td style="padding:4px 8px;font-size:12px;color:#475569;">${li === 0 ? `<strong>${g.title}</strong>` : ''}</td>
         <td style="padding:4px 8px;font-size:12px;text-align:center;">${li === 0 ? `<span style="background:#e8eaf6;padding:2px 8px;border-radius:4px;font-weight:600;">${g.grade}等</span>` : ''}</td>
         <td style="padding:4px 8px;font-size:12px;text-align:center;">${l.level}級</td>
         <td style="padding:4px 8px;"><input type="number" value="${l.min}" style="width:80px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updGradeMatrix('${jf}',${g.grade},${li},'min',this.value)"></td>
         <td style="padding:4px 8px;"><input type="number" value="${l.max}" style="width:80px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updGradeMatrix('${jf}',${g.grade},${li},'max',this.value)"></td>
-      </tr>`);
+        <td style="padding:4px 8px;font-size:11px;color:#6366f1;width:120px;">${markerHtml}</td>
+      </tr>`;
+    });
     return lvlRows.join('');
   }).join('');
 
@@ -590,8 +617,9 @@ function step4HTML() {
         ${famRow}
       </div>
     </div>
-    <div class="scard-desc">職等（Grade）= 責任權限 • 職級（Step）= 熟練度 • 各職系薪資結構不同，可切換檢視。月固定薪應對照所屬職等職級範圍。</div>
-    <table class="r-table" style="font-size:12px;"><thead><tr><th style="width:25%;">職稱</th><th style="width:60px;">職等</th><th style="width:50px;">職級</th><th>下限</th><th>上限</th></tr></thead>
+    <div class="scard-desc">職等（Grade）= 責任權限 · 職級（Step）= 熟練度。各部門月固定薪自動對應職等職級（紫色標記），超出範圍者顯示↑↓。可切換職系查看不同薪資結構。</div>
+    ${outsideRange.length ? `<div style="font-size:12px;color:#ef4444;margin-bottom:8px;">⚠ ${outsideRange.map(m => `${m.name}（NT$ ${m.sal.toLocaleString()}）${m.level === '↑' ? '高於最高職等' : '低於最低職等'}`).join('、')}</div>` : ''}
+    <table class="r-table" style="font-size:12px;"><thead><tr><th style="width:20%;">職稱</th><th style="width:50px;">職等</th><th style="width:40px;">職級</th><th>下限</th><th>上限</th><th style="width:15%;">部門對應</th></tr></thead>
       <tbody>${gradeRows}</tbody>
     </table>
   </div>
