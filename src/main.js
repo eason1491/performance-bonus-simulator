@@ -365,7 +365,9 @@ function step3HTML() {
           <div class="str-panel fixed">
             <div class="str-plabel">■ 固定 ${fr}%</div>
             <div class="str-pamt">NT$ ${fc.toLocaleString()} <small>年</small></div>
-            <div class="str-pitems">月固定 NT$ ${mb.toLocaleString()}<span class="subj">${subj.base.join('、')}</span></div>
+            <div class="str-pitems">月固定 NT$ ${mb.toLocaleString()}<span class="subj">${subj.base.join('、')}</span>
+              ${(() => { const r = findGradeForSal(mb); return `<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:#eef2ff;color:#4338ca;display:inline-block;margin-top:4px;">${r.ok ? `${r.title} ${r.grade}等${r.level}級` : r.level === '↑' ? '⚠ 高於最高級距' : '⚠ 低於最低級距'}</span>`; })()}
+            </div></div>
           </div>
           <div class="str-panel float">
             <div class="str-plabel">■ 浮動 ${br+pr}%</div>
@@ -396,6 +398,21 @@ function getPerPerson(d) {
   const hc = data.headcounts[d.id] || 0;
   const db = getDeptBudget(d);
   return hc > 0 ? Math.round(db / hc) : 0;
+}
+
+function findGradeForSal(salary) {
+  const jf = data.activeJobFamily || '管理系';
+  const matrix = (data.gradeMatrix && data.gradeMatrix[jf]) || DEFAULT_GRADE_MATRIX['管理系'];
+  for (const g of matrix) {
+    for (const l of g.levels) {
+      if (salary >= l.min && salary <= l.max) return { grade: g.grade, title: g.title, level: l.level, ok: true };
+    }
+  }
+  const last = matrix[matrix.length - 1];
+  const lastMax = last.levels[last.levels.length - 1]?.max || 999999;
+  return salary > lastMax
+    ? { grade: last.grade, title: last.title, level: '↑', ok: false }
+    : { grade: matrix[0].grade, title: matrix[0].title, level: '↓', ok: false };
 }
 
 window.updS3 = function(deptId, field, val) {
@@ -530,49 +547,23 @@ function step4HTML() {
   const bench = INDUSTRY_BENCHMARKS[data.industry];
   const health = calcHealth(data.laborRatio, bench);
 
-  // Salary grades — 職等×職級 matrix with department mapping
+  // Grade summary — department-centric view
   const jf = data.activeJobFamily || '管理系';
-  const matrix = (data.gradeMatrix && data.gradeMatrix[jf]) || DEFAULT_GRADE_MATRIX['管理系'];
   const famRow = JOB_FAMILIES.map(f =>
     `<button class="chip ${f === jf ? 'active' : ''}" style="font-size:12px;padding:4px 12px;" onclick="window.switchJobFamily('${f}')">${f}</button>`
   ).join('');
-
-  // Map each dept's monthly base salary to grade/level
-  const deptMarkers = [];
-  active.forEach(d => {
+  const deptGradeRows = active.map(d => {
     const cfg = data.deptConfigs[d.id];
     const sal = cfg.monthlyBase;
-    let found = null;
-    for (const g of matrix) {
-      for (const l of g.levels) {
-        if (sal >= l.min && sal <= l.max) { found = { grade: g.grade, level: l.level }; break; }
-      }
-      if (found) break;
-    }
-    if (!found) {
-      const last = matrix[matrix.length - 1];
-      found = sal > (last.levels[last.levels.length - 1]?.max || 999999) ? { grade: last.grade + 1, level: '↑' } : { grade: 0, level: '↓' };
-    }
-    deptMarkers.push({ name: d.name, sal, grade: found.grade, level: found.level });
-  });
-
-  // Check if any dept is outside range
-  const outsideRange = deptMarkers.filter(m => m.level === '↑' || m.level === '↓');
-
-  const gradeRows = matrix.map(g => {
-    const lvlRows = g.levels.map((l, li) => {
-      const markers = deptMarkers.filter(m => m.grade === g.grade && m.level === l.level);
-      const markerHtml = markers.length ? `<span style="display:block;font-size:10px;color:#6366f1;margin-top:2px;">← ${markers.map(m => m.name).join('、')}</span>` : '';
-      return `<tr>
-        <td style="padding:4px 8px;font-size:12px;color:#475569;">${li === 0 ? `<strong>${g.title}</strong>` : ''}</td>
-        <td style="padding:4px 8px;font-size:12px;text-align:center;">${li === 0 ? `<span style="background:#e8eaf6;padding:2px 8px;border-radius:4px;font-weight:600;">${g.grade}等</span>` : ''}</td>
-        <td style="padding:4px 8px;font-size:12px;text-align:center;">${l.level}級</td>
-        <td style="padding:4px 8px;"><input type="number" value="${l.min}" style="width:80px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updGradeMatrix('${jf}',${g.grade},${li},'min',this.value)"></td>
-        <td style="padding:4px 8px;"><input type="number" value="${l.max}" style="width:80px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updGradeMatrix('${jf}',${g.grade},${li},'max',this.value)"></td>
-        <td style="padding:4px 8px;font-size:11px;color:#6366f1;width:120px;">${markerHtml}</td>
-      </tr>`;
-    });
-    return lvlRows.join('');
+    const r = findGradeForSal(sal);
+    const bg = r.ok ? '#f0fdf4' : '#fef2f2';
+    const cl = r.ok ? '#166534' : '#991b1b';
+    const label = r.ok ? `${r.title} ${r.grade}等${r.level}級` : (r.level === '↑' ? '⚠ 高於最高級距' : '⚠ 低於最低級距');
+    return `<tr style="background:${bg};">
+      <td><strong>${d.name}</strong></td>
+      <td class="r">NT$ ${sal.toLocaleString()}</td>
+      <td style="color:${cl};font-weight:600;">${label}</td>
+    </tr>`;
   }).join('');
 
   // Multi-month comparison (saved snapshots)
@@ -608,20 +599,21 @@ function step4HTML() {
     <div class="r-health" style="border-left-color:${health.color};color:${health.color};background:${health.bg}">${health.text} — ${data.industry} 建議 ${bench ? bench.laborRate : '—'}，目前設定 ${data.laborRatio}%，佔用 ${usedPct}%${bench && bench.note ? `<br><span style="font-weight:400;font-size:11px;">${bench.note}</span>` : ''}</div>
   </div>
 
-  <!-- Grade Matrix -->
+  <!-- Grade Mapping -->
   <div class="scard">
     <div class="scard-title" style="display:flex;align-items:center;justify-content:space-between;">
-      <span>📊 職等職級對照表</span>
+      <span>📊 職等職級對照</span>
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="font-size:11px;color:#64748b;">職系：</span>
         ${famRow}
+        <button class="btn" style="font-size:11px;" onclick="window.showGradeMatrixEditor()">✏ 編輯級距</button>
       </div>
     </div>
-    <div class="scard-desc">職等（Grade）= 責任權限 · 職級（Step）= 熟練度。各部門月固定薪自動對應職等職級（紫色標記），超出範圍者顯示↑↓。可切換職系查看不同薪資結構。</div>
-    ${outsideRange.length ? `<div style="font-size:12px;color:#ef4444;margin-bottom:8px;">⚠ ${outsideRange.map(m => `${m.name}（NT$ ${m.sal.toLocaleString()}）${m.level === '↑' ? '高於最高職等' : '低於最低職等'}`).join('、')}</div>` : ''}
-    <table class="r-table" style="font-size:12px;"><thead><tr><th style="width:20%;">職稱</th><th style="width:50px;">職等</th><th style="width:40px;">職級</th><th>下限</th><th>上限</th><th style="width:15%;">部門對應</th></tr></thead>
-      <tbody>${gradeRows}</tbody>
+    <div class="scard-desc">各部門月固定薪對應之職等（責任權限）與職級（熟練度）。綠底=符合級距，紅底=超出範圍。</div>
+    <table class="r-table" style="font-size:13px;"><thead><tr><th>部門</th><th class="r">月固定薪</th><th>對應職等職級</th></tr></thead>
+      <tbody>${deptGradeRows}</tbody>
     </table>
+  </div>
   </div>
 
   ${snapRows}`;
@@ -664,6 +656,50 @@ window.updGradeMatrix = function(family, grade, lvlIdx, field, val) {
   if (entry && entry.levels[lvlIdx]) {
     entry.levels[lvlIdx][field] = parseInt(val) || 0;
     save();
+  }
+};
+
+window.showGradeMatrixEditor = function() {
+  const jf = data.activeJobFamily || '管理系';
+  const matrix = (data.gradeMatrix && data.gradeMatrix[jf]) || DEFAULT_GRADE_MATRIX['管理系'];
+  const bg = document.createElement('div');
+  bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;';
+  bg.onclick = e => { if (e.target === bg) bg.remove(); };
+  const rows = matrix.map(g => {
+    const lvlHtml = g.levels.map((l, li) => `
+      <tr>
+        <td style="padding:3px 6px;font-size:12px;">${li === 0 ? `<strong>${g.grade}等 ${g.title}</strong>` : ''}</td>
+        <td style="padding:3px 6px;font-size:12px;text-align:center;">${l.level}級</td>
+        <td style="padding:3px 6px;"><input type="number" value="${l.min}" style="width:70px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updGradeMatrix('${jf}',${g.grade},${li},'min',this.value)"></td>
+        <td style="padding:3px 6px;"><input type="number" value="${l.max}" style="width:70px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updGradeMatrix('${jf}',${g.grade},${li},'max',this.value)"></td>
+      </tr>`);
+    return lvlHtml.join('');
+  }).join('');
+  bg.innerHTML = `<div style="background:#fff;border-radius:12px;padding:28px;min-width:500px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);" onclick="event.stopPropagation()">
+    <h3 style="margin-bottom:8px;font-size:16px;font-weight:700;">編輯職等職級級距 — ${jf}</h3>
+    <p style="font-size:12px;color:#64748b;margin-bottom:16px;">職等（責任權限）· 職級（熟練度）。調整各級距薪資範圍，部門月固定薪會自動重新對應。</p>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr><th style="text-align:left;padding:4px 6px;border-bottom:2px solid #e2e8f0;">職等</th><th style="padding:4px 6px;border-bottom:2px solid #e2e8f0;">職級</th><th style="padding:4px 6px;border-bottom:2px solid #e2e8f0;">下限</th><th style="padding:4px 6px;border-bottom:2px solid #e2e8f0;">上限</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:space-between;">
+      <div style="display:flex;gap:8px;">
+        <button class="btn" onclick="window.addGradeRow('${jf}')">＋ 新增職等</button>
+      </div>
+      <button class="btn-primary" onclick="this.closest('div[style]').parentElement.remove();save();render();">完成</button>
+    </div>
+  </div>`;
+  document.body.appendChild(bg);
+};
+
+window.addGradeRow = function(family) {
+  if (!data.gradeMatrix) data.gradeMatrix = JSON.parse(JSON.stringify(DEFAULT_GRADE_MATRIX));
+  const arr = data.gradeMatrix[family];
+  if (arr) {
+    const last = arr[arr.length - 1];
+    const newGrade = last ? last.grade + 1 : 0;
+    arr.push({ grade: newGrade, title: `職等${newGrade}`, levels: [{ level: 1, min: 30000, max: 40000 }, { level: 2, min: 35000, max: 45000 }, { level: 3, min: 40000, max: 50000 }] });
+    save();
+    window.showGradeMatrixEditor();
   }
 };
 
