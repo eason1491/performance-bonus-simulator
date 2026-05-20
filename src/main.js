@@ -372,14 +372,25 @@ function step3HTML() {
               const catLabel = { base: '固定', behavior: '行為', performance: '績效' }[cat];
               const catVal = { base: a.fixedAnnual, behavior: a.behaviorAnnual, performance: a.perfAnnual }[cat];
               const items = (a.subjects && a.subjects[cat]) || [];
+              const template = data.deptConfigs[d.id]?.subjects || {};
+              const templateCats = template[cat] || [];
+              const usedNames = items.map(s => s.name);
+              const available = templateCats.filter(n => !usedNames.includes(n) && typeof n === 'string');
               return `<div>
                 <div style="font-weight:600;color:#475569;margin-bottom:4px;font-size:11px;">${catLabel}</div>
                 ${items.map((s, si) => `<div style="display:flex;align-items:center;gap:4px;margin:2px 0;">
-                  <input value="${s.name}" style="width:70px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:3px;font-size:11px;" onchange="window.updAllocSubj('${d.id}',${ai},'${cat}',${si},'name',this.value)">
-                  <input type="number" value="${s.amount}" style="width:60px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:3px;font-size:11px;" onchange="window.updAllocSubj('${d.id}',${ai},'${cat}',${si},'amount',this.value)">
+                  <span style="font-size:11px;min-width:70px;color:#1e293b;">${s.name}</span>
+                  <input type="number" value="${s.amount}" style="width:70px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:3px;font-size:11px;" onchange="window.updAllocSubj('${d.id}',${ai},'${cat}',${si},'amount',this.value)">
                   <span style="cursor:pointer;color:#ef4444;font-size:14px;" onclick="window.delAllocSubj('${d.id}',${ai},'${cat}',${si})">×</span>
                 </div>`).join('')}
-                <button class="btn" style="font-size:10px;padding:1px 6px;margin-top:2px;" onclick="window.addAllocSubj('${d.id}',${ai},'${cat}')">＋</button>
+                <div style="margin-top:4px;">
+                  <select onchange="window.addAllocSubj('${d.id}',${ai},'${cat}',this.value);this.value='';" style="font-size:11px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:3px;width:100%;">
+                    <option value="">＋ 新增科目</option>
+                    ${available.map(n => `<option value="${n}">${n}</option>`).join('')}
+                    ${available.length > 0 ? `<option value="__custom__">──── 自訂新科目 ────</option>` : ''}
+                    <option value="__custom__">✏ 自訂新科目</option>
+                  </select>
+                </div>
               </div>`;
             }).join('')}
           </div>
@@ -508,12 +519,27 @@ window.updAllocSubj = function(deptId, idx, cat, si, field, val) {
   save();
 };
 
-window.addAllocSubj = function(deptId, idx, cat) {
+window.addAllocSubj = function(deptId, idx, cat, name) {
+  if (!name || name === '' || name === '__custom__') {
+    name = prompt('請輸入科目名稱：');
+    if (!name) return;
+  }
   const alloc = data.deptConfigs[deptId]?.gradeAllocation;
   if (!alloc || !alloc[idx]) return;
-  if (!alloc[idx].subjects) alloc[idx].subjects = { base: [], behavior: [], performance: [] };
-  if (!alloc[idx].subjects[cat]) alloc[idx].subjects[cat] = [];
-  alloc[idx].subjects[cat].push({ name: '新科目', amount: 0 });
+  const a = alloc[idx];
+  if (!a.subjects) a.subjects = { base: [], behavior: [], performance: [] };
+  if (!a.subjects[cat]) a.subjects[cat] = [];
+  const subjName = name || '新科目';
+  const total = { base: a.fixedAnnual, behavior: a.behaviorAnnual, performance: a.perfAnnual }[cat];
+  a.subjects[cat].push({ name: subjName, amount: 0 });
+  // Redistribute amounts
+  const items = a.subjects[cat];
+  if (items.length > 1) {
+    const each = Math.round(total / items.length);
+    items.forEach((item, i) => { item.amount = i === items.length - 1 ? total - each * (items.length - 1) : each; });
+  } else {
+    items[0].amount = total;
+  }
   save();
   renderStepContent();
 };
@@ -521,7 +547,15 @@ window.addAllocSubj = function(deptId, idx, cat) {
 window.delAllocSubj = function(deptId, idx, cat, si) {
   const alloc = data.deptConfigs[deptId]?.gradeAllocation;
   if (!alloc || !alloc[idx] || !alloc[idx].subjects || !alloc[idx].subjects[cat]) return;
-  alloc[idx].subjects[cat].splice(si, 1);
+  const a = alloc[idx];
+  a.subjects[cat].splice(si, 1);
+  // Redistribute amounts
+  const total = { base: a.fixedAnnual, behavior: a.behaviorAnnual, performance: a.perfAnnual }[cat];
+  const items = a.subjects[cat];
+  if (items && items.length) {
+    const each = Math.round(total / items.length);
+    items.forEach((item, i) => { item.amount = i === items.length - 1 ? total - each * (items.length - 1) : each; });
+  }
   save();
   renderStepContent();
 };
