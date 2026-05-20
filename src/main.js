@@ -79,7 +79,7 @@ function renderBudgetPlanner() {
   const defaultShare = Math.round(100 / depts.length);
 
   let deptRows = depts.map((d, i) => {
-    const hc = budget.headcounts[d] || 3;
+    const hc = budget.headcounts[d] !== undefined ? budget.headcounts[d] : 3;
     return `<div class="bp-dept">
       <span class="bp-dname">${d}</span>
       <input type="number" value="${hc}" min="0" max="200" onchange="window.updBudgetHeadcount('${d}',this.value)">
@@ -134,7 +134,8 @@ window.updBudget = function(field, val) {
 };
 
 window.updBudgetHeadcount = function(dept, val) {
-  budget.headcounts[dept] = parseInt(val) || 1;
+  const n = parseInt(val);
+  budget.headcounts[dept] = !isNaN(n) && n >= 0 ? n : 1;
   updateBudgetDisplay();
 };
 
