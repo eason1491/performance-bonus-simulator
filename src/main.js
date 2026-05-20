@@ -407,12 +407,16 @@ function step3HTML() {
             </div>
           </div>`;
         }).join('')}
-        <div style="border-top:1px solid #e2e8f0;padding-top:6px;margin-top:4px;font-size:12px;display:flex;gap:16px;flex-wrap:wrap;">
-          <span>每人月薪 <strong>NT$ ${r.monthlyTotal.toLocaleString()}</strong></span>
-          <span>每人年薪 <strong>NT$ ${r.annualTotal.toLocaleString()}</strong></span>
-          <span style="color:${r.over > 0 ? '#ef4444' : r.over < 0 ? '#10b981' : '#64748b'};">
-            目標 ${a.annualTotal.toLocaleString()} ${r.over > 0 ? `⚠ 超額 ${r.over.toLocaleString()}` : r.over < 0 ? `✅ 餘裕 ${Math.abs(r.over).toLocaleString()}` : '持平'}
-          </span>
+        <div style="border-top:1px solid #e2e8f0;padding-top:6px;margin-top:4px;font-size:12px;">
+          <div style="display:flex;gap:16px;flex-wrap:wrap;font-weight:600;">
+            <span>單人月薪 NT$ ${r.monthlyTotal.toLocaleString()}</span>
+            <span>單人年薪 NT$ ${r.annualTotal.toLocaleString()}</span>
+            <span>人數 × ${a.headcount}</span>
+            <span style="color:#1a237e;">該職等年薪小計 NT$ ${(r.annualTotal * a.headcount).toLocaleString()}</span>
+          </div>
+          <div style="font-size:11px;color:${r.over > 0 ? '#ef4444' : r.over < 0 ? '#10b981' : '#64748b'};margin-top:2px;">
+            目標年薪 ${a.annualTotal.toLocaleString()}/人 ${r.over > 0 ? `⚠ 超額 ${r.over.toLocaleString()}/人` : r.over < 0 ? `✅ 餘裕 ${Math.abs(r.over).toLocaleString()}/人` : '持平'}
+          </div>
         </div>
       </div>` : '';
 
@@ -422,13 +426,14 @@ function step3HTML() {
             <span style="color:#94a3b8;font-size:14px;">${isOpen ? '▾' : '▸'}</span>
             <select onchange="window.updAllocCell('${d.id}',${ai},'grade',this.value);event.stopPropagation();" style="font-size:13px;font-weight:600;padding:1px 4px;border:1px solid #e2e8f0;border-radius:4px;" onclick="event.stopPropagation()">${titleOptions}</select>
             <input type="number" value="${a.headcount}" min="0" max="999" style="width:40px;padding:1px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;" onchange="window.updAllocCell('${d.id}',${ai},'hc',this.value);event.stopPropagation();" onclick="event.stopPropagation()">
-            <span style="margin-left:auto;font-size:12px;color:#64748b;">目標 ${a.annualTotal.toLocaleString()} 實${r.monthlyTotal.toLocaleString()}/月 ${r.annualTotal.toLocaleString()}/年</span>
+            <span style="margin-left:auto;font-size:12px;color:#64748b;">目標 ${a.annualTotal.toLocaleString()}/人</span>
             ${ai > 0 ? `<button class="btn" style="font-size:10px;padding:0 6px;color:#ef4444;" onclick="window.delAllocRow('${d.id}',${ai});event.stopPropagation();">✕</button>` : ''}
           </div>
           <div style="display:flex;gap:12px;margin-top:2px;margin-left:22px;font-size:11px;flex-wrap:wrap;">
             <span style="color:#1a237e;">固定 ${r.monthlyBase.toLocaleString()}/月（${r.fr}%）</span>
             <span style="color:#e65100;">行為 ${r.monthlyBehavior.toLocaleString()}/月（${r.br}%）</span>
             <span style="color:#2e7d32;">績效 ${r.monthlyPerf.toLocaleString()}/月（${r.pr}%）</span>
+            <span style="color:#475569;">小計 ${r.monthlyTotal.toLocaleString()}/月 · ${r.annualTotal.toLocaleString()}/年 × ${a.headcount}人</span>
           </div>
         </div>
         ${detailHtml}
@@ -436,12 +441,28 @@ function step3HTML() {
     }).join('');
 
     const summaryAlloc = calcAllocSummary(alloc);
+    const budgetDiff = summaryAlloc.deptTotal - db;
+    const budgetDisplay = usage <= 100
+      ? `預算使用率 ${usage}% · 剩餘 NT$ ${Math.round(Math.abs(budgetDiff) / 10000).toLocaleString()} 萬`
+      : `預算使用率 ${usage}% · 超出 ${usage - 100}%（NT$ ${Math.round(budgetDiff / 10000).toLocaleString()} 萬）`;
+
+    // Find over-budget sources per grade
+    const overSources = alloc.map(a => {
+      const r = calcAllocRow(a);
+      const rowTotal = r.annualTotal * (a.headcount || 0);
+      return { title: a.title, hc: a.headcount, annual: rowTotal, over: rowTotal - (a.annualTotal * (a.headcount || 0)) };
+    }).filter(x => x.over > 0).slice(0, 3);
+
     const totRow = summaryAlloc.totalHC > 0 ? `<div style="padding:8px 12px;font-size:13px;font-weight:700;background:#f8fafc;border-top:2px solid #0f172a;">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">
         <span>合計 <strong>${summaryAlloc.totalHC}人</strong></span>
         <span>實計年薪 <strong>NT$ ${summaryAlloc.deptTotal.toLocaleString()}</strong></span>
-        <span style="color:${usage > 100 ? '#ef4444' : usage > 80 ? '#f59e0b' : '#10b981'};">預算${usage}% ${usgLabel}</span>
+        <span style="color:${usage > 100 ? '#ef4444' : usage > 80 ? '#f59e0b' : '#10b981'};">${budgetDisplay}</span>
       </div>
+      ${usage > 100 && overSources.length ? `<div style="font-size:11px;color:#ef4444;font-weight:400;margin-top:4px;padding-top:4px;border-top:1px solid #fecaca;">
+        超標來源：${overSources.map(s => `${s.title}${s.hc}人（超 NT$ ${(s.over / 10000).toFixed(1)}萬）`).join(' · ')}
+      </div>` : ''}
+      ${usage <= 100 && usage > 80 ? `<div style="font-size:11px;color:#f59e0b;font-weight:400;margin-top:4px;">⚠ 接近預算上限（${usage}%），建議調整人數或年薪</div>` : ''}
     </div>` : '';
 
     return `<div class="str-card" data-dept-id="${d.id}" style="border-color:${borderColor};${usage > 100 ? 'box-shadow:0 0 0 2px #ef4444;' : ''}">
@@ -451,7 +472,7 @@ function step3HTML() {
         <span style="font-size:11px;padding:3px 8px;border-radius:4px;background:${tClass==='up'?'#e3f2fd':tClass==='flat'?'#f3e5f5':'#e0f2fe'};color:#1e293b;">${d.type}</span>
         <span class="s-hc">${summary.totalHC}人</span>
         <span class="s-budget">預算 NT$ ${Math.round(db/10000).toLocaleString()} 萬</span>
-        <span style="font-size:12px;font-weight:600;color:${usgColor};">${usgLabel} ${usage}%</span>
+        <span style="font-size:12px;font-weight:600;color:${usgColor};">${budgetDisplay}</span>
       </div>
       <div class="str-body" style="padding:0;">
         ${allocRows}
