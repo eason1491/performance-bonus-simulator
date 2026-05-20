@@ -524,67 +524,62 @@ window.delSubjItem = function(deptId, cat, idx) {
   if (cfg && cfg.subjects[cat]) { cfg.subjects[cat].splice(idx, 1); save(); window.showSubjectsEditor(deptId); }
 };
 
-// ── Step 4: Grade Matrix (all families side by side) ──
+// ── Step 4: Grade Matrix (each family as its own table) ──
 function step4HTML() {
   const depts = getDepts();
   const active = depts.filter(d => data.deptConfigs[d.id] && (data.headcounts[d.id] || 0) > 0);
   const matrix = data.gradeMatrix || DEFAULT_GRADE_MATRIX;
   const families = JOB_FAMILIES.filter(f => matrix[f] && matrix[f].length > 0);
 
-  // Union all grades across families, sorted
-  const allGrades = [...new Set(families.flatMap(f => matrix[f].map(g => g.grade)))].sort((a, b) => a - b);
+  const famTables = families.map(family => {
+    const grades = matrix[family];
+    const pm = FAMILY_PAYMIX[family] || { fixed: 70, float: 30, desc: '' };
 
-  const gradeRows = allGrades.map(grade => {
-    // Get title from first family that has this grade
-    let title = '';
-    for (const f of families) {
-      const g = matrix[f].find(x => x.grade === grade);
-      if (g) { title = g.title; break; }
-    }
-    // Build cell per family: show each level's range
-    const cells = families.map(f => {
-      const g = matrix[f].find(x => x.grade === grade);
-      if (!g || !g.levels.length) return `<td style="padding:4px 6px;font-size:11px;color:#d1d5db;text-align:center;">—</td>`;
-      const ranges = g.levels.map(l => `${l.level}級 NT$${l.min.toLocaleString()}-${l.max.toLocaleString()}`).join('<br>');
-      return `<td style="padding:4px 6px;font-size:11px;vertical-align:top;">${ranges}</td>`;
+    const rows = grades.map(g => {
+      const lvlRows = g.levels.map((l, li) => {
+        // Check which active departments map to this grade/level
+        const matched = active.filter(d => {
+          const cfg = data.deptConfigs[d.id];
+          const r = findGradeForSal(cfg.monthlyBase);
+          return r.ok && r.grade === g.grade && r.level === l.level;
+        });
+        const markerHtml = matched.length
+          ? `<span style="font-size:10px;color:#4338ca;margin-left:6px;">← ${matched.map(m => m.name).join('、')}</span>`
+          : '';
+        return `<tr>
+          <td style="padding:4px 8px;font-size:12px;color:#475569;">${li === 0 ? `<strong>${g.title}</strong>` : ''}</td>
+          <td style="padding:4px 8px;font-size:12px;text-align:center;">${li === 0 ? `${g.grade}等` : ''}</td>
+          <td style="padding:4px 8px;font-size:12px;text-align:center;">${l.level}級</td>
+          <td style="padding:4px 8px;font-size:12px;" class="r">NT$ ${l.min.toLocaleString()}</td>
+          <td style="padding:4px 8px;font-size:12px;" class="r">NT$ ${l.max.toLocaleString()}</td>
+          <td style="padding:4px 8px;font-size:11px;">${markerHtml}</td>
+        </tr>`;
+      }).join('');
+      return lvlRows;
     }).join('');
 
-    // Department markers for this grade
-    const markers = active.filter(d => {
-      const cfg = data.deptConfigs[d.id];
-      const sal = cfg.monthlyBase;
-      const r = findGradeForSal(sal);
-      return r.grade === grade;
-    });
-    const markerHtml = markers.length
-      ? `<div style="margin-top:4px;font-size:10px;color:#4338ca;">← ${markers.map(m => m.name).join('、')}</div>`
-      : '';
-
-    return `<tr style="border-bottom:1px solid #f1f5f9;">
-      <td style="padding:4px 6px;font-size:12px;font-weight:600;white-space:nowrap;">${grade}等</td>
-      <td style="padding:4px 6px;font-size:12px;color:#475569;">${title}</td>
-      ${cells}
-    </tr>${markerHtml ? `<tr style="border-bottom:2px solid #e2e8f0;"><td colspan="${2 + families.length}" style="padding:0 6px 6px 14px;">${markerHtml}</td></tr>` : ''}`;
+    return `<div class="scard" style="margin-bottom:16px;">
+      <div class="scard-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>${family}</span>
+        <span style="font-size:11px;font-weight:400;color:#64748b;">固定 ${pm.fixed}% · 浮動 ${pm.float}% · ${pm.desc}</span>
+      </div>
+      <table class="r-table" style="font-size:13px;">
+        <thead><tr><th style="width:20%;">職稱</th><th style="width:50px;">職等</th><th style="width:50px;">職級</th><th class="r">下限</th><th class="r">上限</th><th style="width:20%;">部門對應</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
   }).join('');
 
   return `<div class="scard">
     <div class="scard-title" style="display:flex;align-items:center;justify-content:space-between;">
       <span>❹ 職等職級對照</span>
-      <button class="btn" onclick="window.showGradeMatrixEditor()">✏ 編輯級距表</button>
+      <button class="btn" onclick="window.showGradeMatrixEditor()">✏ 編輯所有級距</button>
     </div>
     <div class="scard-desc">
       <strong>職等</strong>（Grade）= 責任權限 · <strong>職級</strong>（Step）= 熟練度。<br>
-      四大職系並列對照，各部門月固定薪自動標記在對應職等行。綠底=符合級距，紅底=超出。
+      各部門月固定薪自動對應職等職級。可在編輯器中增刪調整。
     </div>
-    ${active.length ? `<table class="r-table" style="font-size:12px;">
-      <thead><tr><th style="width:50px;">職等</th><th style="width:120px;">職稱</th>
-        ${families.map(f => {
-          const pm = FAMILY_PAYMIX[f] || { fixed: 70, float: 30 };
-          return `<th style="font-size:11px;text-align:center;">${f}<br><span style="font-weight:400;color:#64748b;">${pm.fixed}/${pm.float}</span></th>`;
-        }).join('')}
-      </tr></thead>
-      <tbody>${gradeRows}</tbody>
-    </table>` : '<div class="empty">尚無部門資料</div>'}
+    ${famTables}
   </div>${stepNav('下一步：總覽報表 ›', true)}`;
 }
 
@@ -690,86 +685,72 @@ window.updGradeMatrix = function(family, grade, lvlIdx, field, val) {
 window.showGradeMatrixEditor = function() {
   const matrix = data.gradeMatrix || DEFAULT_GRADE_MATRIX;
   const families = JOB_FAMILIES.filter(f => matrix[f] && matrix[f].length > 0);
-  const allGrades = [...new Set(families.flatMap(f => matrix[f].map(g => g.grade)))].sort((a, b) => a - b);
 
   const bg = document.createElement('div');
   bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;';
   bg.onclick = e => { if (e.target === bg) bg.remove(); };
 
-  // Build header with family names
-  const famTitles = families.map(f => {
-    const pm = FAMILY_PAYMIX[f] || { fixed: 70, float: 30, desc: '' };
-    return `<th colspan="2" style="font-size:11px;text-align:center;padding:4px;border-bottom:2px solid #e2e8f0;">${f}<br><span style="font-weight:400;color:#64748b;">${pm.fixed}/${pm.float}</span></th>`;
-  }).join('');
+  const famHtml = families.map(family => {
+    const grades = matrix[family];
+    const pm = FAMILY_PAYMIX[family] || { fixed: 70, float: 30, desc: '' };
 
-  const gradeRows = allGrades.map(grade => {
-    let title = '';
-    let gradeActions = '';
-    for (const f of families) {
-      const g = matrix[f].find(x => x.grade === grade);
-      if (g) { title = g.title; break; }
-    }
-    const cells = families.map(f => {
-      const g = matrix[f].find(x => x.grade === grade);
-      if (!g || !g.levels.length) return `<td style="padding:2px;font-size:11px;color:#d1d5db;text-align:center;border-bottom:1px solid #f1f5f9;" colspan="2">—<br><button class="btn" style="font-size:9px;padding:1px 6px;margin-top:4px;" onclick="window.addGradeLevel('${f}',${grade})">＋</button></td>`;
-
-      // Calculate band width
-      const firstMin = g.levels[0]?.min || 0;
-      const lastMax = g.levels[g.levels.length - 1]?.max || 0;
-      const width = firstMin > 0 ? Math.round((lastMax - firstMin) / firstMin * 100) : 0;
-      const idealW = grade <= 2 ? '20-30%' : grade <= 5 ? '30-40%' : '40-60%';
-      const widthOk = (grade <= 2 && width >= 20 && width <= 30) || (grade >= 3 && grade <= 5 && width >= 30 && width <= 40) || (grade >= 6 && width >= 40 && width <= 60);
-
+    const rows = grades.map(g => {
       const lvlHtml = g.levels.map((l, li) => {
-        return `<div style="${li > 0 ? 'border-top:1px solid #f1f5f9;' : ''}padding:2px 4px;display:flex;align-items:center;gap:4px;font-size:11px;">
-          <span style="min-width:20px;color:#64748b;">${l.level}級</span>
-          <input type="number" value="${l.min}" style="width:50px;padding:2px 3px;border:1px solid #e2e8f0;border-radius:3px;font-size:11px;" onchange="window.updGradeMatrix('${f}',${g.grade},${li},'min',this.value)">
-          <span style="color:#94a3b8;">∼</span>
-          <input type="number" value="${l.max}" style="width:50px;padding:2px 3px;border:1px solid #e2e8f0;border-radius:3px;font-size:11px;" onchange="window.updGradeMatrix('${f}',${g.grade},${li},'max',this.value)">
-          ${g.levels.length > 1 && li === g.levels.length - 1 ? `<button style="border:none;background:none;cursor:pointer;color:#ef4444;font-size:14px;line-height:1;padding:0 2px;" onclick="window.delGradeLevel('${f}',${g.grade},${li})">×</button>` : ''}
-        </div>`;
+        const lWidth = Math.round((l.max - l.min) / l.min * 100);
+        const idealW = g.grade <= 2 ? '20-30%' : g.grade <= 5 ? '30-40%' : '40-60%';
+        const widthOk = g.levels.length > 1 && ((g.grade <= 2 && lWidth >= 20 && lWidth <= 30) || (g.grade >= 3 && g.grade <= 5 && lWidth >= 30 && lWidth <= 40) || (g.grade >= 6 && lWidth >= 40 && lWidth <= 60));
+        return `<tr>
+          <td style="padding:4px 6px;font-size:12px;color:#475569;border-bottom:1px solid #f1f5f9;">${li === 0 ? `<input value="${g.title}" style="width:90px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updGradeTitle('${family}',${g.grade},this.value)">` : ''}</td>
+          <td style="padding:4px 6px;font-size:12px;text-align:center;border-bottom:1px solid #f1f5f9;">${li === 0 ? `<span style="background:#e8eaf6;padding:2px 8px;border-radius:4px;font-weight:600;">${g.grade}等</span>` : ''}</td>
+          <td style="padding:4px 6px;text-align:center;border-bottom:1px solid #f1f5f9;"><input type="number" value="${l.level}" style="width:36px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;" onchange="window.updGradeLevel('${family}',${g.grade},${li},this.value)"></td>
+          <td style="padding:4px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${l.min}" style="width:65px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updGradeMatrix('${family}',${g.grade},${li},'min',this.value)"></td>
+          <td style="padding:4px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${l.max}" style="width:65px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updGradeMatrix('${family}',${g.grade},${li},'max',this.value)"></td>
+          <td style="font-size:11px;color:${widthOk ? '#10b981' : '#94a3b8'};border-bottom:1px solid #f1f5f9;">${g.levels.length > 1 ? `${lWidth}%` : '—'}</td>
+          <td style="padding:4px 6px;border-bottom:1px solid #f1f5f9;">
+            ${li === 0 && g.levels.length > 1 ? `<button class="btn" style="font-size:9px;padding:1px 6px;" onclick="window.addGradeLevel('${family}',${g.grade})">＋ 職級</button>` : ''}
+            ${g.levels.length > 1 && li === g.levels.length - 1 ? `<button class="btn" style="font-size:9px;padding:1px 6px;color:#ef4444;" onclick="window.delGradeLevel('${family}',${g.grade},${li})">✕</button>` : ''}
+          </td>
+        </tr>`;
       }).join('');
-
-      return `<td style="padding:2px;vertical-align:top;border-bottom:1px solid #f1f5f9;min-width:130px;" colspan="2">
-        ${lvlHtml}
-        <div style="display:flex;gap:4px;align-items:center;padding:2px 4px;">
-          <button class="btn" style="font-size:9px;padding:1px 6px;" onclick="window.addGradeLevel('${f}',${g.grade})">＋ 職級</button>
-          <span style="font-size:9px;color:${widthOk ? '#10b981' : '#f59e0b'};">帶寬${width}%${widthOk ? ' ✅' : ' ⚠'}</span>
-        </div>
-      </td>`;
+      const prev = grades[grades.indexOf(g) - 1];
+      const overlap = prev && prev.levels.length && g.levels.length
+        ? Math.round((prev.levels[prev.levels.length - 1].max - g.levels[0].min) / (prev.levels[prev.levels.length - 1].max - prev.levels[prev.levels.length - 1].min) * 100) : null;
+      return lvlHtml + (grades.indexOf(g) < grades.length - 1 ? '' : '');
     }).join('');
 
-    const titleInput = `<input value="${title}" style="width:80px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:11px;" onchange="window.updGradeTitle('${families[0]}',${grade},this.value)">`;
-    const delBtn = `<button class="btn" style="font-size:9px;padding:1px 6px;color:#ef4444;" onclick="window.delGradeRow(${grade})">✕</button>`;
-
-    return `<tr style="border-bottom:1px solid #e2e8f0;">
-      <td style="padding:4px 6px;font-size:12px;font-weight:600;vertical-align:top;">${grade}等<br>${delBtn}</td>
-      <td style="padding:4px 6px;font-size:11px;vertical-align:top;">${titleInput}</td>
-      ${cells}
-    </tr>`;
+    return `<div style="margin-bottom:16px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+      <div style="background:#f8fafc;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e2e8f0;">
+        <strong style="font-size:14px;">${family}</strong>
+        <span style="font-size:11px;color:#64748b;">固定 ${pm.fixed}% · 浮動 ${pm.float}%</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="border-bottom:2px solid #e2e8f0;">
+          <th style="text-align:left;padding:4px 6px;font-size:11px;">職稱</th>
+          <th style="padding:4px 6px;font-size:11px;">職等</th>
+          <th style="padding:4px 6px;font-size:11px;">職級</th>
+          <th style="padding:4px 6px;font-size:11px;">下限</th>
+          <th style="padding:4px 6px;font-size:11px;">上限</th>
+          <th style="padding:4px 6px;font-size:11px;">帶寬</th>
+          <th style="padding:4px 6px;font-size:11px;"></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="padding:4px 8px;border-top:1px solid #e2e8f0;display:flex;gap:6px;">
+        <button class="btn" style="font-size:10px;padding:2px 8px;" onclick="window.addGradeRow('${family}')">＋ 新增職等</button>
+        <button class="btn" style="font-size:10px;padding:2px 8px;color:#ef4444;" onclick="window.delLastGrade('${family}')">✕ 刪末等</button>
+      </div>
+    </div>`;
   }).join('');
 
-  bg.innerHTML = `<div style="background:#fff;border-radius:12px;padding:20px;min-width:800px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);" onclick="event.stopPropagation()">
+  bg.innerHTML = `<div style="background:#fff;border-radius:12px;padding:24px;min-width:600px;max-width:700px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);" onclick="event.stopPropagation()">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <h3 style="font-size:16px;font-weight:700;">📊 職等職級對照表</h3>
-      <div style="display:flex;gap:6px;">
-        <button class="btn" onclick="window.addGradeRow()">＋ 新增職等</button>
-        <button class="btn" onclick="window.addJobFamily()">＋ 新增職系</button>
-      </div>
+      <h3 style="font-size:16px;font-weight:700;">📊 編輯職等職級對照表</h3>
+      <button class="btn" onclick="window.addJobFamily()">＋ 新增職系</button>
     </div>
-    <div style="background:#f8fafc;padding:8px 12px;border-radius:8px;margin-bottom:12px;font-size:11px;color:#475569;">
-      四大職系並列編輯。每職級可調上下限，帶寬自動計算。點「＋新增職等」可在所有職系同時增加一列。
+    <div style="background:#f0f9ff;padding:8px 12px;border-radius:8px;margin-bottom:16px;font-size:11px;color:#1e40af;">
+      每個職系獨立編輯。帶寬建議：基層20-30%、中階30-40%、高階40-60%。點儲存後 Step 4 會自動反映變更。
     </div>
-    <div style="overflow-x:auto;">
-    <table style="width:100%;border-collapse:collapse;min-width:700px;">
-      <thead><tr>
-        <th style="text-align:left;padding:4px 6px;font-size:12px;border-bottom:2px solid #1e293b;white-space:nowrap;width:50px;">職等</th>
-        <th style="text-align:left;padding:4px 6px;font-size:12px;border-bottom:2px solid #1e293b;white-space:nowrap;width:100px;">職稱</th>
-        ${famTitles}
-      </tr></thead>
-      <tbody>${gradeRows}</tbody>
-    </table>
-    </div>
+    ${famHtml}
     <div style="margin-top:16px;text-align:right;">
       <button class="btn-primary" onclick="this.closest('div[style]').parentElement.remove();save();render();">完成</button>
     </div>
@@ -825,45 +806,26 @@ window.delGradeLevel = function(family, grade, idx) {
   if (entry && entry.levels.length > 1) { entry.levels.splice(idx, 1); save(); window.showGradeMatrixEditor(); }
 };
 
-window.addGradeRow = function() {
+window.addGradeRow = function(family) {
   if (!data.gradeMatrix) data.gradeMatrix = JSON.parse(JSON.stringify(DEFAULT_GRADE_MATRIX));
-  const families = Object.keys(data.gradeMatrix);
-  let maxGrade = 0;
-  families.forEach(f => {
-    const arr = data.gradeMatrix[f];
-    if (arr && arr.length) {
-      const last = arr[arr.length - 1];
-      if (last.grade > maxGrade) maxGrade = last.grade;
-    }
-  });
-  const newGrade = maxGrade + 1;
-  families.forEach(f => {
-    if (!data.gradeMatrix[f]) data.gradeMatrix[f] = [];
-    const last = data.gradeMatrix[f][data.gradeMatrix[f].length - 1];
-    const baseMin = last ? last.levels[0]?.min || 30000 : 30000;
-    const baseMax = last ? last.levels[0]?.max || 35000 : 35000;
-    data.gradeMatrix[f].push({ grade: newGrade, title: `職等${newGrade}`,
-      levels: [{ level: 1, min: baseMin + 3000, max: baseMax + 5000 },
-               { level: 2, min: baseMin + 6000, max: baseMax + 9000 }]
-    });
-  });
-  save();
-  window.showGradeMatrixEditor();
+  const arr = data.gradeMatrix[family];
+  if (arr && arr.length) {
+    const last = arr[arr.length - 1];
+    const newGrade = last.grade + 1;
+    const baseMin = last.levels[0]?.min || 30000;
+    const baseMax = last.levels[0]?.max || 35000;
+    const levels = last.levels.map(l => ({ level: l.level, min: l.min + 3000, max: l.max + 5000 }));
+    arr.push({ grade: newGrade, title: `職等${newGrade}`, levels });
+    save();
+    window.showGradeMatrixEditor();
+  }
 };
 
-window.delGradeRow = function(grade) {
-  if (!data.gradeMatrix) return;
-  const families = Object.keys(data.gradeMatrix);
-  let hasData = false;
-  families.forEach(f => {
-    const arr = data.gradeMatrix[f];
-    if (arr && arr.length > 1 && arr.find(g => Number(g.grade) === Number(grade))) hasData = true;
-  });
-  if (!hasData) return;
-  if (!confirm(`確定刪除 ${grade} 等？（所有職系同步刪除）`)) return;
-  families.forEach(f => {
-    data.gradeMatrix[f] = (data.gradeMatrix[f] || []).filter(g => Number(g.grade) !== Number(grade));
-  });
+window.delLastGrade = function(family) {
+  if (!data.gradeMatrix || !data.gradeMatrix[family] || data.gradeMatrix[family].length <= 1) return;
+  const last = data.gradeMatrix[family][data.gradeMatrix[family].length - 1];
+  if (!confirm(`確定刪除 ${family} 的 ${last.grade} 等？`)) return;
+  data.gradeMatrix[family].pop();
   save();
   window.showGradeMatrixEditor();
 };
