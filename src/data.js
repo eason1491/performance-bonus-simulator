@@ -1,6 +1,5 @@
 // ── 產業與部門資料模型 ──
 
-// 產業清單及其包含的部門
 export const INDUSTRIES = {
   '科技/軟體/電商': ['業務', '行銷', '技術/研發', '專案/交付', '職能', '客服', '採購'],
   '製造業（含代工）': ['業務', '技術/研發', '生產', '物流', '職能', '採購', '品保/風控'],
@@ -194,42 +193,29 @@ export const TYPE_SUBJECTS = {
 export const ALL_DEPTS = Object.keys(DEPT_RATIOS);
 export const JOB_TYPES = ['上山型', '平路型', '下山型'];
 
-// ── ID 產生器 ──
 let _idc = 0;
 export function genDeptId() {
   return `d${++_idc}_${Date.now().toString(36)}`;
 }
 
-// ── 取得產業預設部門清單 ──
 export function getIndustryDepts(ind) {
   return (INDUSTRIES[ind] || []).map(name => ({
-    id: genDeptId(),
-    name,
-    type: DEPT_TYPE[name] || '平路型',
-    enabled: true
+    id: genDeptId(), name, type: DEPT_TYPE[name] || '平路型', enabled: true
   }));
 }
 
-// ── 部門是否有已知的比對資料 ──
-export function isKnownDept(name) {
-  return !!DEPT_RATIOS[name];
-}
+export function isKnownDept(name) { return !!DEPT_RATIOS[name]; }
 
-// ── 取得部門預設比例 ──
 export function getDeptRatios(name, type) {
   if (isKnownDept(name)) return DEPT_RATIOS[name];
   return TYPE_RATIOS[type] || TYPE_RATIOS['平路型'];
 }
 
-// ── 取得部門預設科目 ──
 export function getDeptSubjects(name, type) {
-  if (DEPT_SUBJECTS[name]) {
-    return JSON.parse(JSON.stringify(DEPT_SUBJECTS[name]));
-  }
+  if (DEPT_SUBJECTS[name]) return JSON.parse(JSON.stringify(DEPT_SUBJECTS[name]));
   return JSON.parse(JSON.stringify(TYPE_SUBJECTS[type] || TYPE_SUBJECTS['平路型']));
 }
 
-// ── 建立部門設定 ──
 export function createDeptConfig(deptId, name, type, annualTotal) {
   const r = getDeptRatios(name, type);
   const fixedAnnual = Math.round(annualTotal * r.fixed / 100);
@@ -237,25 +223,10 @@ export function createDeptConfig(deptId, name, type, annualTotal) {
   const perfAnnual = Math.round(annualTotal * r.performance / 100);
   const monthlyBase = Math.round(fixedAnnual / 12);
   const subj = getDeptSubjects(name, type);
-
-  return {
-    deptName: name,
-    type: r.type || type,
-    desc: r.desc || '',
-    annualTotal,
-    fixedRatio: r.fixed,
-    behaviorRatio: r.behavior,
-    performanceRatio: r.performance,
-    monthlyBase,
-    fixedAnnual,
-    behaviorAnnual,
-    perfAnnual,
-    subjects: subj,
-    enabled: true
-  };
+  return { deptName: name, type: r.type || type, desc: r.desc || '', annualTotal, fixedRatio: r.fixed, behaviorRatio: r.behavior, performanceRatio: r.performance, monthlyBase, fixedAnnual, behaviorAnnual, perfAnnual, subjects: subj, enabled: true };
 }
 
-// ── 預設職等職級對照（職等=責任，職級=熟練度） ──
+// ── 職等職級對照 ──
 export const RANK_TITLES = {
   0: '試用期', 1: '助理', 2: '專員', 3: '副課長', 4: '課長',
   5: '副理', 6: '經理', 7: '資深經理', 8: '協理', 9: '副總經理', 10: '總經理'
@@ -263,7 +234,6 @@ export const RANK_TITLES = {
 
 export const JOB_FAMILIES = ['管理系', '業務開發', '技術研發', '後勤支援'];
 
-// 預設各職系之職等職級薪資對照 (from 04薪資職等職級對照表ver2.0.pdf)
 export const DEFAULT_GRADE_MATRIX = {
   '管理系': [
     { grade: 0, title: '試用期人員', levels: [{ level: 0, min: 28000, max: 30000 }] },
@@ -319,7 +289,7 @@ export const DEFAULT_GRADE_MATRIX = {
   ]
 };
 
-// ── 職系預設薪酬組合（固定：變動） ──
+// ── 職系預設薪酬組合 ──
 export const FAMILY_PAYMIX = {
   '管理系': { fixed: 80, float: 20, desc: '以保底底薪為主，強調管理責任' },
   '業務開發': { fixed: 40, float: 60, desc: '責任底薪+高變動，業績驅動' },
@@ -327,16 +297,74 @@ export const FAMILY_PAYMIX = {
   '後勤支援': { fixed: 80, float: 20, desc: '底薪+職務加給，重視流程穩定' }
 };
 
+// ── 部門型態→職系對應 ──
+export const DEPT_JOB_FAMILY = { '上山型': '業務開發', '平路型': '管理系', '下山型': '技術研發' };
+export function getJobFamilyForDept(deptType) { return DEPT_JOB_FAMILY[deptType] || '管理系'; }
+
+// ── 建立預設人員分配（自動分層） ──
+export function createDefaultAllocation(headcount, deptName, deptType, gradeMatrix) {
+  const jf = getJobFamilyForDept(deptType);
+  const grades = gradeMatrix[jf] || [];
+  if (!grades.length || headcount <= 0) return [];
+  const typeRatios = { '上山型': { fixed: 40, behavior: 10, performance: 50 }, '平路型': { fixed: 80, behavior: 10, performance: 10 }, '下山型': { fixed: 70, behavior: 10, performance: 20 } };
+  const baseRatios = typeRatios[deptType] || typeRatios['平路型'];
+  let tiers = [];
+  if (headcount <= 3) {
+    if (headcount >= 1) tiers.push({ label: '管理層', offset: -2, count: 1 });
+    if (headcount >= 2) tiers.push({ label: '資深', offset: -1, count: 1 });
+    if (headcount >= 3) tiers.push({ label: '基層員工', offset: 0, count: headcount - 2 });
+  } else if (headcount <= 8) {
+    tiers = [
+      { label: '管理層', offset: -3, count: 1 },
+      { label: '中階', offset: -2, count: Math.max(1, Math.round(headcount * 0.2)) },
+      { label: '基層主管', offset: -1, count: Math.max(1, Math.round(headcount * 0.3)) },
+      { label: '基層員工', offset: 0, count: headcount }
+    ];
+    tiers[3].count = Math.max(1, headcount - tiers.slice(0, 3).reduce((s, t) => s + t.count, 0));
+  } else {
+    tiers = [
+      { label: '管理層', offset: -3, count: 1 },
+      { label: '中階', offset: -2, count: Math.max(2, Math.round(headcount * 0.15)) },
+      { label: '基層主管', offset: -1, count: Math.max(3, Math.round(headcount * 0.25)) },
+      { label: '基層員工', offset: 0, count: headcount }
+    ];
+    tiers[3].count = Math.max(1, headcount - tiers.slice(0, 3).reduce((s, t) => s + t.count, 0));
+  }
+  const subj = getDeptSubjects(deptName, deptType);
+  const withAmounts = (names, total) => names.map((n, i, a) => ({ name: n, amount: i === a.length - 1 ? total - Math.round(total / a.length) * (a.length - 1) : Math.round(total / a.length) }));
+  return tiers.map(t => {
+    const idx = t.offset < 0 ? Math.max(0, grades.length + t.offset) : Math.min(t.offset, grades.length - 1);
+    const g = grades[Math.min(idx, grades.length - 1)];
+    const lvl = g ? g.levels[Math.floor(g.levels.length / 2)] : null;
+    const midMonthly = lvl ? Math.round((lvl.min + lvl.max) / 2) : 30000;
+    const annualTotal = midMonthly * 14; // 12 months + 2 months bonus
+    const fixedAnnual = Math.round(annualTotal * baseRatios.fixed / 100);
+    const behaviorAnnual = Math.round(annualTotal * baseRatios.behavior / 100);
+    const perfAnnual = Math.round(annualTotal * baseRatios.performance / 100);
+    return {
+      grade: g ? g.grade : -1, level: lvl ? lvl.level : 1, title: g ? g.title : t.label,
+      headcount: t.count, annualTotal,
+      fixedRatio: baseRatios.fixed, behaviorRatio: baseRatios.behavior, performanceRatio: baseRatios.performance,
+      fixedAnnual, behaviorAnnual, perfAnnual, monthlyBase: Math.round(fixedAnnual / 12),
+      subjects: {
+        base: withAmounts(subj.base, fixedAnnual),
+        behavior: withAmounts(subj.behavior, behaviorAnnual),
+        performance: withAmounts(subj.performance, perfAnnual)
+      }
+    };
+  });
+}
+
 // 向後相容
 export const DEFAULT_GRADES = [
   { level: '實習/工讀', min: 27470, max: 35000 },
-  { level: '助理',      min: 30000, max: 40000 },
-  { level: '專員',      min: 35000, max: 50000 },
-  { level: '資深專員',   min: 45000, max: 65000 },
-  { level: '主任/組長',  min: 55000, max: 80000 },
-  { level: '副理',       min: 65000, max: 95000 },
-  { level: '經理',       min: 80000, max: 120000 },
-  { level: '協理/總監',  min: 100000, max: 150000 },
+  { level: '助理', min: 30000, max: 40000 },
+  { level: '專員', min: 35000, max: 50000 },
+  { level: '資深專員', min: 45000, max: 65000 },
+  { level: '主任/組長', min: 55000, max: 80000 },
+  { level: '副理', min: 65000, max: 95000 },
+  { level: '經理', min: 80000, max: 120000 },
+  { level: '協理/總監', min: 100000, max: 150000 },
   { level: '副總/總經理', min: 140000, max: 250000 }
 ];
 
@@ -361,22 +389,15 @@ export function parseRange(str) {
 export function defaultData(ind) {
   const depts = getIndustryDepts(ind);
   const hc = {};
-  const ids = {};
-  depts.forEach(d => { hc[d.id] = 3; ids[d.id] = d; });
+  depts.forEach(d => { hc[d.id] = 3; });
   const bench = INDUSTRY_BENCHMARKS[ind];
   const range = bench ? parseRange(bench.laborRate) : { min: 20, max: 40 };
   return {
-    industry: ind,
-    departments: depts,
-    monthlyRevenue: 500,
+    industry: ind, departments: depts, monthlyRevenue: 500,
     laborRatio: Math.round((range.min + range.max) / 2),
-    headcounts: hc,
-    deptConfigs: {},
+    headcounts: hc, deptConfigs: {},
     grades: JSON.parse(JSON.stringify(DEFAULT_GRADES)),
     gradeMatrix: JSON.parse(JSON.stringify(DEFAULT_GRADE_MATRIX)),
-    activeJobFamily: '管理系',
-    step: 1,
-    planName: '未命名方案',
-    planId: null
+    activeJobFamily: '管理系', step: 1, planName: '未命名方案', planId: null
   };
 }
