@@ -118,9 +118,10 @@ function updateBudgetDisplay() {
   if (totalEl) totalEl.textContent = `NT$ ${annualTotal.toLocaleString()} 萬`;
   if (monthEl) monthEl.textContent = `（月均 NT$ ${(annualTotal / 12).toLocaleString()} 萬）`;
 
-  const totalHC = depts.reduce((s, d) => s + (budget.headcounts[d] || 0), 0);
+  depts.forEach(d => { if (budget.headcounts[d] === undefined) budget.headcounts[d] = 3; });
+  const totalHC = depts.reduce((s, d) => s + budget.headcounts[d], 0);
   depts.forEach(d => {
-    const hc = budget.headcounts[d] || 0;
+    const hc = budget.headcounts[d];
     const deptBudget = totalHC > 0 ? Math.round(annualTotal * hc / totalHC) : 0;
     const bdEl = document.getElementById(`bd-${d}`);
     if (bdEl) bdEl.textContent = hc > 0 ? `NT$${deptBudget.toLocaleString()}萬` : '—';
