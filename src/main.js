@@ -323,8 +323,23 @@ function updateSummary() {
   // Industry benchmark
   const bench = INDUSTRY_BENCHMARKS[selectedIndustry];
   if (bench) {
-    document.getElementById('benchmark').innerHTML =
-      `<div class="bm"><span>${selectedIndustry}</span> 建議人事成本 <strong>${bench.laborRate}</strong> ｜ 毛利率參考 <strong>${bench.grossMargin}</strong></div>`;
+    const range = parseRatioRange(bench.laborRate);
+    const current = budget.locked ? budget.laborRatio : null;
+    let status = '', color = '';
+    if (current !== null) {
+      if (current < range.min * 0.8) { status = '⚠️ 偏低 — 可能留不住人'; color = '#f39c12'; }
+      else if (current <= range.max) { status = '✅ 很健康'; color = '#2e7d32'; }
+      else if (current <= range.max * 1.3) { status = '⚡ 有問題 — 接近紅線'; color = '#e65100'; }
+      else { status = '🔴 有危險 — 人事成本過高'; color = '#c62828'; }
+      document.getElementById('benchmark').innerHTML =
+        `<div class="bm" style="border-left:4px solid ${color};">
+          <span>${selectedIndustry}</span> 建議 ${bench.laborRate} ｜ 目前設定 <strong>${current}%</strong> ${status}
+          <br><small>毛利率參考 ${bench.grossMargin}</small>
+        </div>`;
+    } else {
+      document.getElementById('benchmark').innerHTML =
+        `<div class="bm"><span>${selectedIndustry}</span> 建議人事成本 <strong>${bench.laborRate}</strong> ｜ 毛利率參考 <strong>${bench.grossMargin}</strong></div>`;
+    }
   }
 }
 
