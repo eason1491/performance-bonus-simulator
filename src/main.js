@@ -102,7 +102,7 @@ function renderBudgetPlanner() {
           <button class="btn" onclick="window.resetBudget()">重設</button>
         </div>
       </div>
-      <div class="bp-total">年人事總預算 <strong id="bpTotal">NT$ ${(annualTotal/10000).toFixed(0)} 萬</strong> <small id="bpMonthly">（月均 NT$ ${(annualTotal/12/10000).toFixed(0)} 萬）</small></div>
+      <div class="bp-total">年人事總預算 <strong id="bpTotal"></strong> <small id="bpMonthly"></small></div>
       <div class="bp-depts" id="bpDepts">${deptRows}</div>
       <div class="bp-hint">💡 調整各部門人數後，系統自動按比例分配預算。點「套用至部門」將預算寫入部門卡片。</div>
     </div>`;
@@ -116,13 +116,13 @@ function updateBudgetDisplay() {
   const defaultShare = Math.round(100 / depts.length);
   const totalEl = document.getElementById('bpTotal');
   const monthEl = document.getElementById('bpMonthly');
-  if (totalEl) totalEl.textContent = `NT$ ${(annualTotal/10000).toFixed(0)} 萬`;
-  if (monthEl) monthEl.textContent = `（月均 NT$ ${(annualTotal/12/10000).toFixed(0)} 萬）`;
+  if (totalEl) totalEl.textContent = `NT$ ${annualTotal.toLocaleString()} 萬`;
+  if (monthEl) monthEl.textContent = `（月均 NT$ ${(annualTotal / 12).toLocaleString()} 萬）`;
   depts.forEach((d, i) => {
     const share = i < depts.length - 1 ? defaultShare : 100 - defaultShare * (depts.length - 1);
     const deptBudget = Math.round(annualTotal * share / 100);
     const bdEl = document.getElementById(`bd-${d}`);
-    if (bdEl) bdEl.textContent = `NT$${(deptBudget/10000).toFixed(0)}萬`;
+    if (bdEl) bdEl.textContent = `NT$${deptBudget.toLocaleString()}萬`;
   });
 }
 
