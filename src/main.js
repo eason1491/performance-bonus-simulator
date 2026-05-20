@@ -77,30 +77,31 @@ function updateDepts() {
     const bc = cfg ? cfg.behaviorAnnual : Math.round(600000 * r.behavior / 100);
     const pc = cfg ? cfg.perfAnnual : Math.round(600000 * r.performance / 100);
 
+    const subj = DEPT_SUBJECTS[d];
     return `<div class="d-card ${checked ? 'on' : 'off'}" id="card-${d}">
       <div class="d-head" onclick="window.toggleDept('${d}')">
         <input type="checkbox" ${checked ? 'checked' : ''} onclick="event.stopPropagation();window.toggleDept('${d}')">
         <span class="d-name">${d}</span>
         <span class="d-type ${tClass}">${type}</span>
         <span class="d-desc">${r.desc}</span>
-        <span class="d-one">${ONE_LINERS[d] || ''}</span>
       </div>
       <div class="d-body ${checked ? '' : 'hidden'}">
-        <div class="d-row">
-          <div class="d-field"><label>年薪總包</label><input type="number" value="${ac}" min="200000" max="5000000" step="10000" oninput="window.updCfg('${d}','total',this.value)"></div>
-          <div class="d-ratios">
-            <div class="d-ratio"><label>固定 ${r.fixed}%</label><span>NT$ ${fc.toLocaleString()}</span><span class="sub">月 ${mb.toLocaleString()}</span></div>
-            <div class="d-ratio"><label>行為 ${r.behavior}%</label><span>NT$ ${bc.toLocaleString()}</span></div>
-            <div class="d-ratio"><label>績效 ${r.performance}%</label><span>NT$ ${pc.toLocaleString()}</span></div>
+        <div class="d-field" style="margin-bottom:8px;"><label>年薪總包</label><input type="number" value="${ac}" min="200000" max="5000000" step="10000" oninput="window.updCfg('${d}','total',this.value)"></div>
+        <div style="margin-bottom:10px;font-size:13px;background:#f8f9fa;border-radius:6px;padding:10px;">
+          <div style="font-weight:600;color:#1a1a2e;margin-bottom:6px;">固定 <span style="color:#4361ee;">${r.fixed}%</span>　NT$ ${fc.toLocaleString()}/年（月 ${mb.toLocaleString()}）</div>
+          <div style="font-size:12px;color:#888;margin-bottom:8px;padding-left:12px;border-left:2px solid #ddd;">
+            <strong>基本資格</strong>：${subj.base.join('、')}
+          </div>
+          <div style="font-weight:600;color:#1a1a2e;margin-bottom:6px;margin-top:8px;">浮動 <span style="color:#e67e22;">${r.behavior + r.performance}%</span>　NT$ ${(bc + pc).toLocaleString()}/年</div>
+          <div style="font-size:12px;color:#888;padding-left:12px;border-left:2px solid #e67e22;">
+            <div style="margin-bottom:4px;"><strong>行為獎金（考核 ${r.behavior}% NT$ ${bc.toLocaleString()}）</strong>：${subj.behavior.join('、')}</div>
+            <div><strong>績效獎金（${r.performance}% NT$ ${pc.toLocaleString()}）</strong>：${subj.performance.join('、')}</div>
           </div>
         </div>
         <div class="d-subj">
-          <div class="d-subj-group"><strong>基本資格</strong>${DEPT_SUBJECTS[d].base.map(s => `<span>${s}</span>`).join('')}</div>
-          <div class="d-subj-group"><strong>行為獎金</strong>${DEPT_SUBJECTS[d].behavior.map(s => `<span>${s}</span>`).join('')}</div>
-          <div class="d-subj-group"><strong>績效獎金</strong>${DEPT_SUBJECTS[d].performance.map(s => `<span>${s}</span>`).join('')}</div>
-          <div class="d-subj-group"><strong>分紅</strong>${DEPT_SUBJECTS[d].bonus.map(s => `<span>${s}</span>`).join('')}</div>
-          <div class="d-subj-group"><strong>福利</strong>${DEPT_SUBJECTS[d].welfare.map(s => `<span>${s}</span>`).join('')}</div>
-          <div class="d-subj-group"><span style="color:#e74c3c;">風險</span>${DEPT_SUBJECTS[d].risks.map(s => `<span>${s}</span>`).join('')}</div>
+          <div class="d-subj-group" style="background:#fff8e1;"><strong style="color:#f39c12;">公司分紅（外加）</strong>${subj.bonus.map(s => `<span>${s}</span>`).join('')}</div>
+          <div class="d-subj-group" style="background:#e8f5e9;"><strong style="color:#27ae60;">其他福利（外加）</strong>${subj.welfare.map(s => `<span>${s}</span>`).join('')}</div>
+          <div class="d-subj-group" style="background:#ffebee;"><strong style="color:#e74c3c;">風險條件</strong>${subj.risks.map(s => `<span>${s}</span>`).join('')}</div>
         </div>
       </div>
     </div>`;
@@ -151,17 +152,18 @@ function updateSummary() {
     totalF += cfg.fixedAnnual;
     totalB += cfg.behaviorAnnual;
     totalP += cfg.perfAnnual;
+    const floatPct = cfg.behaviorRatio + cfg.performanceRatio;
     return `<tr class="t-${tc}"><td><strong>${d}</strong></td><td><span class="d-type ${tc}" style="font-size:10px;">${type}</span></td>
       <td class="r">NT$ ${cfg.monthlyBase.toLocaleString()}</td>
       <td class="r">NT$ ${cfg.fixedAnnual.toLocaleString()}</td>
       <td class="r">NT$ ${cfg.behaviorAnnual.toLocaleString()}</td>
       <td class="r">NT$ ${cfg.perfAnnual.toLocaleString()}</td>
       <td class="r"><strong>NT$ ${cfg.annualTotal.toLocaleString()}</strong></td>
-      <td class="r">${cfg.fixedRatio}:${cfg.behaviorRatio + cfg.performanceRatio}</td></tr>`;
+      <td class="r">${cfg.fixedRatio}:${floatPct}</td></tr>`;
   }).join('');
 
   const grand = totalF + totalB + totalP;
-  container.innerHTML = `<table class="stbl"><thead><tr><th>部門</th><th>型</th><th class="r">月固定</th><th class="r">年固定</th><th class="r">行為</th><th class="r">績效</th><th class="r">年薪總包</th><th class="r">固:浮</th></tr></thead>
+  container.innerHTML = `<table class="stbl"><thead><tr><th>部門</th><th>型</th><th class="r">月固定</th><th class="r">年固定</th><th class="r">行為(考核)</th><th class="r">績效</th><th class="r">年薪總包</th><th class="r">固:浮</th></tr></thead>
     <tbody>${rows}
     <tr class="t-total"><td><strong>合計</strong></td><td></td><td class="r">NT$ ${Math.round(grand/12).toLocaleString()}</td>
       <td class="r"><strong>NT$ ${totalF.toLocaleString()}</strong></td>
