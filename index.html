@@ -6,53 +6,53 @@
 <title>薪酬結構設計平台 v1</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#f5f6fa; color:#2c3e50; font-size:15px; }
+body { font-family: 'Inter', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#f8f9fc; color:#1e293b; font-size:15px; -webkit-font-smoothing:antialiased; }
 .hidden { display:none !important; }
 
 /* Login */
-#login { display:flex; align-items:center; justify-content:center; min-height:100vh; background:linear-gradient(135deg, #1a237e 0%, #283593 100%); }
-.login-box { background:#fff; border-radius:20px; padding:56px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.15); max-width:420px; width:90%; }
-.login-box h1 { font-size:26px; letter-spacing:1px; color:#1a237e; margin-bottom:8px; }
-.login-box p { color:#888; margin-bottom:28px; font-size:14px; }
-.btn-google { display:inline-flex; align-items:center; gap:12px; padding:14px 36px; background:#fff; border:2px solid #e0e0e0; border-radius:10px; font-size:16px; cursor:pointer; transition:.3s; }
-.btn-google:hover { border-color:#1a237e; box-shadow:0 4px 12px rgba(26,35,126,.1); }
+#login { display:flex; align-items:center; justify-content:center; min-height:100vh; background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
+.login-box { background:#fff; border-radius:16px; padding:48px 56px; text-align:center; box-shadow:0 25px 50px -12px rgba(0,0,0,.25); max-width:400px; width:90%; }
+.login-box h1 { font-size:24px; font-weight:700; color:#0f172a; margin-bottom:4px; letter-spacing:-.3px; }
+.login-box p { color:#64748b; margin-bottom:24px; font-size:14px; }
+.btn-google { display:inline-flex; align-items:center; gap:10px; padding:12px 32px; background:#fff; border:1.5px solid #e2e8f0; border-radius:8px; font-size:15px; font-weight:500; cursor:pointer; transition:.2s; color:#334155; }
+.btn-google:hover { border-color:#6366f1; color:#6366f1; box-shadow:0 4px 12px rgba(99,102,241,.08); }
 
 /* App Shell */
-#app { max-width:1600px; margin:0 auto; padding:0 24px; }
+#app { max-width:1600px; margin:0 auto; padding:0 32px; }
 
 /* Top Bar */
-.topbar { display:flex; align-items:center; justify-content:space-between; padding:16px 0; border-bottom:2px solid #e8eaf6; margin-bottom:20px; }
-.topbar h1 { font-size:20px; color:#1a237e; letter-spacing:.5px; }
-.topbar h1 small { font-size:13px; color:#90a4ae; font-weight:400; margin-left:8px; }
+.topbar { display:flex; align-items:center; justify-content:space-between; padding:20px 0; border-bottom:1px solid #e2e8f0; margin-bottom:24px; }
+.topbar h1 { font-size:18px; font-weight:700; color:#0f172a; letter-spacing:-.3px; }
+.topbar h1 small { font-size:12px; color:#94a3b8; font-weight:400; margin-left:8px; }
 .actions { display:flex; gap:10px; align-items:center; }
-.user { display:flex; align-items:center; gap:10px; font-size:13px; }
-.user img { width:32px; height:32px; border-radius:50%; border:2px solid #e8eaf6; }
-.user .logout { color:#90a4ae; cursor:pointer; font-size:12px; }
-.user .logout:hover { color:#e74c3c; }
-.btn { padding:8px 18px; border-radius:8px; border:1px solid #cfd8dc; background:#fff; font-size:13px; cursor:pointer; transition:.2s; }
-.btn:hover { background:#eceff1; }
-.btn-primary { padding:10px 28px; border-radius:8px; border:none; background:#1a237e; color:#fff; font-size:14px; font-weight:600; cursor:pointer; transition:.2s; }
-.btn-primary:hover { background:#283593; }
-.btn-primary:disabled { opacity:.4; cursor:default; }
+.user { display:flex; align-items:center; gap:10px; font-size:13px; color:#64748b; }
+.user img { width:30px; height:30px; border-radius:50%; border:1.5px solid #e2e8f0; }
+.user .logout { color:#94a3b8; cursor:pointer; font-size:12px; transition:.15s; }
+.user .logout:hover { color:#ef4444; }
+.btn { padding:8px 16px; border-radius:6px; border:1px solid #e2e8f0; background:#fff; font-size:13px; font-weight:500; cursor:pointer; transition:.15s; color:#475569; }
+.btn:hover { background:#f8fafc; border-color:#cbd5e1; }
+.btn-primary { padding:10px 24px; border-radius:6px; border:none; background:#0f172a; color:#fff; font-size:13px; font-weight:600; cursor:pointer; transition:.15s; letter-spacing:.3px; }
+.btn-primary:hover { background:#1e293b; }
+.btn-primary:disabled { opacity:.35; cursor:default; }
 
 /* Industry chips */
-.chip-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
-.chip { padding:8px 20px; border-radius:28px; border:1px solid #cfd8dc; background:#fff; font-size:14px; cursor:pointer; transition:.2s; }
-.chip:hover { border-color:#1a237e; color:#1a237e; }
-.chip.active { background:#1a237e; color:#fff; border-color:#1a237e; }
+.chip-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
+.chip { padding:8px 20px; border-radius:20px; border:1px solid #e2e8f0; background:#fff; font-size:13px; font-weight:500; cursor:pointer; transition:.15s; color:#475569; }
+.chip:hover { border-color:#6366f1; color:#6366f1; background:#f8fafc; }
+.chip.active { background:#0f172a; color:#fff; border-color:#0f172a; }
 
 /* Step Indicator */
-.steps { display:flex; align-items:center; gap:0; margin-bottom:24px; background:#fff; border-radius:12px; padding:16px 24px; border:1px solid #e8eaf6; }
-.step { display:flex; align-items:center; gap:8px; flex:1; position:relative; }
-.step-num { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; transition:.3s; }
-.step.active .step-num { background:#1a237e; color:#fff; }
-.step.done .step-num { background:#2e7d32; color:#fff; }
-.step.pending .step-num { background:#e8eaf6; color:#90a4ae; }
-.step-label { font-size:13px; font-weight:600; transition:.3s; }
-.step.active .step-label { color:#1a237e; }
-.step.done .step-label { color:#2e7d32; }
-.step.pending .step-label { color:#b0bec5; }
-.step-arrow { color:#cfd8dc; font-size:18px; margin:0 4px; }
+.steps { display:flex; align-items:center; gap:0; margin-bottom:24px; background:#fff; border-radius:10px; padding:16px 24px; border:1px solid #e2e8f0; }
+.step { display:flex; align-items:center; gap:10px; flex:1; position:relative; }
+.step-num { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; transition:.2s; }
+.step.active .step-num { background:#0f172a; color:#fff; }
+.step.done .step-num { background:#059669; color:#fff; }
+.step.pending .step-num { background:#f1f5f9; color:#94a3b8; }
+.step-label { font-size:13px; font-weight:600; transition:.2s; }
+.step.active .step-label { color:#0f172a; }
+.step.done .step-label { color:#059669; }
+.step.pending .step-label { color:#94a3b8; }
+.step-arrow { color:#e2e8f0; font-size:20px; margin:0 4px; font-weight:300; }
 
 /* Main Layout */
 .main { display:flex; gap:24px; min-height:calc(100vh - 200px); }
@@ -60,86 +60,21 @@ body { font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI
 .sidebar { width:340px; flex-shrink:0; }
 
 /* Sidebar - Budget Overview */
-.sbo { background:#fff; border-radius:12px; border:1px solid #e8eaf6; padding:20px; position:sticky; top:16px; }
-.sbo-title { font-size:15px; font-weight:700; color:#1a237e; margin-bottom:12px; }
-.sbo-row { display:flex; justify-content:space-between; padding:6px 0; font-size:13px; border-bottom:1px solid #f5f6fa; }
-.sbo-row .sbo-lbl { color:#78909c; }
-.sbo-row .sbo-val { font-weight:600; color:#1a237e; }
-.sbo-bar { height:10px; background:#e8eaf6; border-radius:5px; margin:10px 0; overflow:hidden; }
-.sbo-bar-fill { height:100%; border-radius:5px; transition:width .3s; }
-.sbo-bar-fill.good { background:#2e7d32; }
-.sbo-bar-fill.warn { background:#e65100; }
-.sbo-bar-fill.danger { background:#c62828; }
-.sbo-bar-label { font-size:11px; color:#90a4ae; text-align:right; }
-.sbo-health { padding:8px 12px; border-radius:8px; font-size:13px; font-weight:600; margin-top:8px; }
-
-/* Step Content Cards */
-.scard { background:#fff; border-radius:12px; border:1px solid #e8eaf6; padding:24px; margin-bottom:16px; }
-.scard-title { font-size:17px; font-weight:700; color:#1a237e; margin-bottom:16px; }
-.scard-desc { font-size:13px; color:#78909c; margin-bottom:16px; }
-
-/* Step 1: Budget */
-.b1-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
-.b1-field label { display:block; font-size:12px; color:#90a4ae; margin-bottom:4px; font-weight:500; }
-.b1-field input { width:100%; padding:10px 12px; border:1.5px solid #e0e0e0; border-radius:8px; font-size:16px; font-weight:600; color:#1a237e; background:#fafbff; }
-.b1-field input:focus { outline:none; border-color:#1a237e; box-shadow:0 0 0 3px rgba(26,35,126,.1); }
-.b1-total { font-size:22px; font-weight:700; color:#1a237e; padding:14px 18px; background:#e8eaf6; border-radius:10px; margin-bottom:8px; }
-.b1-total small { font-size:14px; font-weight:400; color:#78909c; }
-.b1-suggest { font-size:13px; color:#78909c; margin-bottom:16px; }
-
-/* Step 2: Allocation */
-.b2-table { width:100%; border-collapse:collapse; font-size:14px; margin-bottom:16px; }
-.b2-table th { background:#fafbff; padding:10px 12px; text-align:left; font-weight:600; border-bottom:2px solid #e8eaf6; color:#1a237e; font-size:12px; }
-.b2-table td { padding:10px 12px; border-bottom:1px solid #e8eaf6; vertical-align:middle; }
-.b2-table td input { width:60px; padding:6px 8px; border:1.5px solid #e0e0e0; border-radius:6px; font-size:14px; text-align:center; }
-.b2-table td input:focus { outline:none; border-color:#1a237e; box-shadow:0 0 0 3px rgba(26,35,126,.1); }
-.b2-total { font-size:15px; font-weight:700; color:#1a237e; padding:10px 12px; background:#fafbff; border-top:2px solid #1a237e; }
-
-/* Step 3: Structure */
-.str-card { background:#fff; border:1px solid #e8eaf6; border-radius:10px; margin-bottom:12px; overflow:hidden; }
-.str-head { display:flex; align-items:center; gap:12px; padding:12px 16px; background:#fafbff; cursor:pointer; user-select:none; font-size:14px; }
-.str-head .s-name { font-weight:700; color:#1a237e; min-width:70px; }
-.str-head .s-hc { color:#78909c; font-size:12px; }
-.str-head .s-budget { margin-left:auto; font-weight:600; color:#1a237e; font-size:14px; }
-.str-body { padding:16px; border-top:1px solid #e8eaf6; }
-.str-ctl { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; margin-bottom:12px; }
-.str-ctl-item label { font-size:11px; color:#90a4ae; display:block; margin-bottom:3px; }
-.str-ctl-item input { width:100%; padding:8px 10px; border:1.5px solid #e0e0e0; border-radius:6px; font-size:14px; font-weight:600; color:#1a237e; background:#fafbff; }
-.str-ctl-item input:focus { outline:none; border-color:#1a237e; box-shadow:0 0 0 3px rgba(26,35,126,.1); }
-.str-prev { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.str-panel { padding:12px; border-radius:8px; }
-.str-panel.fixed { background:linear-gradient(135deg,#e8eaf6,#f5f6fa); border:1px solid #c5cae9; }
-.str-panel.float { background:linear-gradient(135deg,#fff8e1,#fffde7); border:1px solid #ffe082; }
-.str-plabel { font-size:12px; font-weight:700; color:#1a237e; letter-spacing:.5px; margin-bottom:2px; }
-.str-pamt { font-size:18px; font-weight:700; color:#1a237e; margin-bottom:4px; }
-.str-pamt small { font-size:12px; font-weight:400; color:#78909c; }
-.str-pitems { font-size:13px; color:#546e7a; line-height:1.6; }
-.str-pitems .subj { color:#90a4ae; font-size:12px; display:block; }
-.str-extra { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
-.str-extra-item { padding:6px 10px; border-radius:6px; font-size:12px; flex:1; min-width:120px; }
-.str-extra-item.bonus { background:#fff3e0; border:1px solid #ffe0b2; color:#e65100; }
-.str-extra-item.welfare { background:#e8f5e9; border:1px solid #c8e6c9; color:#2e7d32; }
-.str-extra-item.risk { background:#fce4ec; border:1px solid #f8bbd0; color:#c62828; }
-
-/* Step 4: Report */
-.r-table { width:100%; border-collapse:collapse; font-size:14px; }
-.r-table th { background:#fafbff; padding:12px 10px; text-align:left; font-weight:600; border-bottom:2px solid #e8eaf6; color:#1a237e; font-size:12px; }
-.r-table td { padding:10px; border-bottom:1px solid #e8eaf6; }
-.r-table .r { text-align:right; }
-.r-table .t-up td { background:#fffdf5; border-left:3px solid #e65100; }
-.r-table .t-flat td { border-left:3px solid #2e7d32; }
-.r-table .t-down td { border-left:3px solid #1565c0; }
-.r-table .t-total td { font-weight:700; border-top:2px solid #1a237e; background:#fafbff; color:#1a237e; font-size:15px; }
-.r-health { padding:12px 16px; border-radius:8px; font-size:14px; font-weight:600; margin-top:12px; border-left:4px solid; }
-
-/* Step nav */
-.step-nav { display:flex; justify-content:space-between; margin-top:20px; padding-top:16px; border-top:1px solid #e8eaf6; }
-
-/* Empty */
-.empty { text-align:center; color:#b0bec5; padding:40px 0; font-size:15px; }
+.sbo { background:#fff; border-radius:10px; border:1px solid #e2e8f0; padding:20px; position:sticky; top:16px; }
+.sbo-title { font-size:14px; font-weight:700; color:#0f172a; margin-bottom:16px; letter-spacing:-.2px; }
+.sbo-row { display:flex; justify-content:space-between; padding:8px 0; font-size:13px; border-bottom:1px solid #f8fafc; }
+.sbo-row .sbo-lbl { color:#64748b; }
+.sbo-row .sbo-val { font-weight:600; color:#0f172a; font-variant-numeric:tabular-nums; }
+.sbo-bar { height:8px; background:#f1f5f9; border-radius:4px; margin:12px 0 4px; overflow:hidden; }
+.sbo-bar-fill { height:100%; border-radius:4px; transition:width .3s; }
+.sbo-bar-fill.good { background:#10b981; }
+.sbo-bar-fill.warn { background:#f59e0b; }
+.sbo-bar-fill.danger { background:#ef4444; }
+.sbo-bar-label { font-size:11px; color:#94a3b8; text-align:right; margin-bottom:8px; }
+.sbo-health { padding:10px 14px; border-radius:6px; font-size:12px; font-weight:600; margin-top:12px; line-height:1.5; }
 
 /* Print */
-@media print { .sidebar,.steps,.chip-row,.step-nav,.actions,.user .logout { display:none!important; } body { background:#fff; } #app { max-width:100%; padding:0; } }
+@media print { .sidebar,.steps,.chip-row,.step-nav,.actions,.user .logout,.footer { display:none!important; } body { background:#fff; color:#000; } #app { max-width:100%; padding:0; } .scard { break-inside:avoid; border:1px solid #ddd; } }
 
 /* Responsive */
 @media (max-width:1100px) { .main { flex-direction:column; } .sidebar { width:100%; } }
@@ -185,6 +120,8 @@ body { font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI
     </div>
   </div>
 </div>
+
+<div class="footer">© 2026 <strong>睿謙事業有限公司（RCBC）</strong> — 薪酬結構設計平台 v1</div>
 
 <script type="module" src="/src/main.js"></script>
 </body>
