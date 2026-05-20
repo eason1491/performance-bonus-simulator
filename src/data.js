@@ -13,22 +13,12 @@ export const INDUSTRIES = {
   '其他': ['業務', '行銷', '門市/營運', '技術/研發', '專案/交付', '生產', '物流', '職能', '客服', '採購', '品保/風控']
 };
 
-// 部門類型對應
 export const DEPT_TYPE = {
-  '業務': '上山型',
-  '行銷': '上山型',
-  '門市/營運': '上山型',
-  '技術/研發': '下山型',
-  '專案/交付': '下山型',
-  '生產': '下山型',
-  '物流': '下山型',
-  '職能': '平路型',
-  '客服': '平路型',
-  '採購': '平路型',
-  '品保/風控': '平路型'
+  '業務': '上山型', '行銷': '上山型', '門市/營運': '上山型',
+  '技術/研發': '下山型', '專案/交付': '下山型', '生產': '下山型', '物流': '下山型',
+  '職能': '平路型', '客服': '平路型', '採購': '平路型', '品保/風控': '平路型'
 };
 
-// 部門預設比例 (固定 : 行為 : 績效)
 export const DEPT_RATIOS = {
   '業務':        { fixed: 40, behavior: 10, performance: 50, type: '上山型', desc: '開發客戶、創造營收' },
   '行銷':        { fixed: 50, behavior: 10, performance: 40, type: '上山型', desc: '創造流量、產生商機' },
@@ -43,7 +33,6 @@ export const DEPT_RATIOS = {
   '品保/風控':    { fixed: 80, behavior: 10, performance: 10, type: '平路型', desc: '預防風險、改善制度' }
 };
 
-// 部門薪資科目細項
 export const DEPT_SUBJECTS = {
   '業務': {
     base: ['業務底薪', '職級津貼', '外勤津貼'],
@@ -135,7 +124,6 @@ export const DEPT_SUBJECTS = {
   }
 };
 
-// 產業人事成本參考（來自 PPTX）
 export const INDUSTRY_BENCHMARKS = {
   '科技/軟體/電商':     { laborRate: '30%-50%', grossMargin: '70%-90%' },
   '製造業（含代工）':    { laborRate: '5%-15%', grossMargin: '5%-20%' },
@@ -148,14 +136,12 @@ export const INDUSTRY_BENCHMARKS = {
   '其他':              { laborRate: '20%-40%', grossMargin: '—' }
 };
 
-// 類型說明
 export const TYPE_DESCRIPTIONS = {
   '上山型': '重績效 — 獎開拓，結果越能由個人直接創造，浮動比例就越可拉高',
   '平路型': '重職能 — 獎穩定，流程效率與交付品質比刺激性重要',
   '下山型': '重技能 — 獎交付，技術能力與專案成果決定薪酬水位'
 };
 
-// 一句話原則
 export const ONE_LINERS = {
   '業務': '不能只買業績，要同時買毛利與回款',
   '行銷': '不能只買曝光，要買有效商機與轉換',
@@ -170,19 +156,92 @@ export const ONE_LINERS = {
   '品保/風控': '不能只買抓錯，要買改善閉環與風險預防'
 };
 
-// 建立預設部門設定
-export function createDeptConfig(deptName, annualTotal) {
-  const r = DEPT_RATIOS[deptName];
-  if (!r) return null;
+// ── 型態預設比例（自訂部門用） ──
+export const TYPE_RATIOS = {
+  '上山型': { fixed: 40, behavior: 10, performance: 50 },
+  '平路型': { fixed: 80, behavior: 10, performance: 10 },
+  '下山型': { fixed: 70, behavior: 10, performance: 20 }
+};
+
+// ── 型態預設科目（自訂部門用） ──
+export const TYPE_SUBJECTS = {
+  '上山型': {
+    base: ['基本底薪', '職級津貼'],
+    behavior: ['業務行為獎金', '客戶開發獎金'],
+    performance: ['業績獎金', '目標達成獎金'],
+    bonus: ['團隊分紅', '年終獎金'],
+    welfare: ['競賽獎勵', '培訓補助'],
+    risks: ['業績達成率', '客戶滿意度']
+  },
+  '平路型': {
+    base: ['基本薪資', '職務津貼'],
+    behavior: ['全勤獎金', '協作獎金'],
+    performance: ['效率獎金', '品質獎金'],
+    bonus: ['績效分紅', '年終獎金'],
+    welfare: ['久任獎金', '三節獎金'],
+    risks: ['準確率', '時效']
+  },
+  '下山型': {
+    base: ['專業底薪', '技能津貼'],
+    behavior: ['專案執行獎金', '協作獎金'],
+    performance: ['交付獎金', '品質獎金'],
+    bonus: ['專案分紅', '年終獎金'],
+    welfare: ['證照補助', '專業訓練'],
+    risks: ['交付時效', '品質標準']
+  }
+};
+
+export const ALL_DEPTS = Object.keys(DEPT_RATIOS);
+export const JOB_TYPES = ['上山型', '平路型', '下山型'];
+
+// ── ID 產生器 ──
+let _idc = 0;
+export function genDeptId() {
+  return `d${++_idc}_${Date.now().toString(36)}`;
+}
+
+// ── 取得產業預設部門清單 ──
+export function getIndustryDepts(ind) {
+  return (INDUSTRIES[ind] || []).map(name => ({
+    id: genDeptId(),
+    name,
+    type: DEPT_TYPE[name] || '平路型',
+    enabled: true
+  }));
+}
+
+// ── 部門是否有已知的比對資料 ──
+export function isKnownDept(name) {
+  return !!DEPT_RATIOS[name];
+}
+
+// ── 取得部門預設比例 ──
+export function getDeptRatios(name, type) {
+  if (isKnownDept(name)) return DEPT_RATIOS[name];
+  return TYPE_RATIOS[type] || TYPE_RATIOS['平路型'];
+}
+
+// ── 取得部門預設科目 ──
+export function getDeptSubjects(name, type) {
+  if (DEPT_SUBJECTS[name]) {
+    return JSON.parse(JSON.stringify(DEPT_SUBJECTS[name]));
+  }
+  return JSON.parse(JSON.stringify(TYPE_SUBJECTS[type] || TYPE_SUBJECTS['平路型']));
+}
+
+// ── 建立部門設定 ──
+export function createDeptConfig(deptId, name, type, annualTotal) {
+  const r = getDeptRatios(name, type);
   const fixedAnnual = Math.round(annualTotal * r.fixed / 100);
   const behaviorAnnual = Math.round(annualTotal * r.behavior / 100);
   const perfAnnual = Math.round(annualTotal * r.performance / 100);
   const monthlyBase = Math.round(fixedAnnual / 12);
+  const subj = getDeptSubjects(name, type);
 
   return {
-    dept: deptName,
-    type: r.type,
-    desc: r.desc,
+    deptName: name,
+    type: r.type || type,
+    desc: r.desc || '',
     annualTotal,
     fixedRatio: r.fixed,
     behaviorRatio: r.behavior,
@@ -191,10 +250,59 @@ export function createDeptConfig(deptName, annualTotal) {
     fixedAnnual,
     behaviorAnnual,
     perfAnnual,
-    subjects: DEPT_SUBJECTS[deptName] || { base: [], behavior: [], performance: [], bonus: [], welfare: [], risks: [] },
+    subjects: subj,
     enabled: true
   };
 }
 
-// 匯出所有部門名稱
-export const ALL_DEPTS = Object.keys(DEPT_RATIOS);
+// ── 預設薪資級距 ──
+export const DEFAULT_GRADES = [
+  { level: '實習/工讀', min: 27470, max: 35000 },
+  { level: '助理',      min: 30000, max: 40000 },
+  { level: '專員',      min: 35000, max: 50000 },
+  { level: '資深專員',   min: 45000, max: 65000 },
+  { level: '主任/組長',  min: 55000, max: 80000 },
+  { level: '副理',       min: 65000, max: 95000 },
+  { level: '經理',       min: 80000, max: 120000 },
+  { level: '協理/總監',  min: 100000, max: 150000 },
+  { level: '副總/總經理', min: 140000, max: 250000 }
+];
+
+// ── 預算佔用率健康判斷 ──
+export function calcHealth(laborRatio, bench) {
+  if (!bench) return { text: '—', color: '#94a3b8', bg: '#f8fafc' };
+  const range = parseRange(bench.laborRate);
+  const r = laborRatio;
+  if (r < range.min * 0.8) return { text: '⚠️ 偏低', color: '#f59e0b', bg: '#fffbeb' };
+  if (r <= range.max) return { text: '✅ 很健康', color: '#10b981', bg: '#f0fdf4' };
+  if (r <= range.max * 1.3) return { text: '⚡ 有問題', color: '#f97316', bg: '#fff7ed' };
+  return { text: '🔴 有危險', color: '#ef4444', bg: '#fef2f2' };
+}
+
+export function parseRange(str) {
+  if (!str) return { min: 20, max: 40 };
+  const m = str.match(/([\d.]+)\s*-\s*([\d.]+)/);
+  return m ? { min: parseFloat(m[1]), max: parseFloat(m[2]) } : { min: 20, max: 40 };
+}
+
+// ── 預設資料 ──
+export function defaultData(ind) {
+  const depts = getIndustryDepts(ind);
+  const hc = {};
+  const ids = {};
+  depts.forEach(d => { hc[d.id] = 3; ids[d.id] = d; });
+  const bench = INDUSTRY_BENCHMARKS[ind];
+  const range = bench ? parseRange(bench.laborRate) : { min: 20, max: 40 };
+  return {
+    industry: ind,
+    departments: depts,
+    monthlyRevenue: 500,
+    laborRatio: Math.round((range.min + range.max) / 2),
+    headcounts: hc,
+    deptConfigs: {},
+    grades: JSON.parse(JSON.stringify(DEFAULT_GRADES)),
+    step: 1,
+    planName: '未命名方案',
+    planId: null
+  };
+}
