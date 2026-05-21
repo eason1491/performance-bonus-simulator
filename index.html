@@ -173,6 +173,15 @@ body { font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI
   </div>
 </div>
 
+<div id="unauthorized" class="hidden">
+  <div class="login-box">
+    <h1>薪酬結構設計平台</h1>
+    <p style="color:#e74c3c;">🔒 此帳號未獲授權使用</p>
+    <p style="color:#888;font-size:13px;" id="uauthEmail"></p>
+    <button class="btn-primary" onclick="window.signOut()">登出</button>
+  </div>
+</div>
+
 <div id="app" class="hidden">
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:16px;">

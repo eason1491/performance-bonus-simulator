@@ -5,6 +5,7 @@ let curUser = null;
 let currentStep = 1;
 let data = null;
 const STORAGE_KEY = 'salary_v2';
+const ALLOWED_EMAILS = ['rcbc.a001@gmail.com'];
 
 onAuthChange((e, u) => { if (u) { curUser = u; showApp(); } });
 getCurrentUser().then(u => { if (u) { curUser = u; showApp(); } });
@@ -12,7 +13,15 @@ window.signInWithGoogle = signInWithGoogle;
 window.signOut = signOut;
 
 function showApp() {
+  if (!curUser || !ALLOWED_EMAILS.includes(curUser.email)) {
+    document.getElementById('login').classList.add('hidden');
+    document.getElementById('app').classList.add('hidden');
+    document.getElementById('unauthorized').classList.remove('hidden');
+    document.getElementById('uauthEmail').textContent = curUser ? curUser.email : '';
+    return;
+  }
   document.getElementById('login').classList.add('hidden');
+  document.getElementById('unauthorized').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   const meta = curUser.user_metadata || {};
   document.getElementById('userName').textContent = meta.full_name || curUser.email;
