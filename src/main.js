@@ -1553,11 +1553,10 @@ window.exportExcel = function() {
   URL.revokeObjectURL(a.href);
 };
 
-// ── PWA Setup ──
-function setupPWA() { if ('serviceWorker' in navigator) { navigator.serviceWorker.register('./sw.js').catch(() => {}); } }
+// ── Version display (commit hash + date, updated on build) ──
+const BUILD_VERSION = `v2026.05.21-a0369eb`;
 
 if (document.getElementById('planSelector')) renderPlanList();
-setupPWA();
 
 window.exportCSV = function() {
   if (!data) return;
