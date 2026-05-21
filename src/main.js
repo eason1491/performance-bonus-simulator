@@ -1553,10 +1553,12 @@ window.exportExcel = function() {
   URL.revokeObjectURL(a.href);
 };
 
-// ── Version display (commit hash + date, updated on build) ──
-const BUILD_VERSION = `v2026.05.21-a0369eb`;
+// ── Build version (injected by Vite define) ──
+const BUILD_VERSION = `${__BRANCH__} @ ${__COMMIT_HASH__} · ${__BUILD_TIME__}`;
+window.BUILD_VERSION = BUILD_VERSION;
 
 if (document.getElementById('planSelector')) renderPlanList();
+document.getElementById('buildVersion').textContent = BUILD_VERSION;
 
 window.exportCSV = function() {
   if (!data) return;
