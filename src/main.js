@@ -111,7 +111,7 @@ function calcAllocRow(a) {
   const fr = Number(a.fixedRatio) || 0;
   const br = Number(a.behaviorRatio) || 0;
   const pr = Number(a.performanceRatio) || 0;
-  const pctSum = fr + br + pr;
+  console.log('【calcAllocRow input】', { fixedRatio: a.fixedRatio, behaviorRatio: a.behaviorRatio, performanceRatio: a.performanceRatio, annualTotal: a.annualTotal });
 
   const targetBase  = Math.round(packageAnnual * fr / 100);
   const targetBehav = Math.round(packageAnnual * br / 100);
@@ -137,10 +137,10 @@ function calcAllocRow(a) {
 
   const allocatedAnnual = targetBase + targetBehav + targetPerf;
   const unallocatedAnnual = packageAnnual - allocatedAnnual;
-  return {
-    fr, br, pr, pctSum,
-    unallocated: pctSum < 100 ? 100 - pctSum : 0,
-    pctOver: pctSum > 100 ? pctSum - 100 : 0,
+  const result = {
+    fr, br, pr, pctSum: fr + br + pr,
+    unallocated: fr + br + pr < 100 ? 100 - (fr + br + pr) : 0,
+    pctOver: fr + br + pr > 100 ? fr + br + pr - 100 : 0,
     packageAnnual, allocatedAnnual, unallocatedAnnual,
     targetBase, targetBehav, targetPerf,
     monthlyBase: Math.round(targetBase / 12),
@@ -151,6 +151,12 @@ function calcAllocRow(a) {
     baseCat, behaviorCat, performanceCat,
     anyError: baseCat.error || behaviorCat.error || performanceCat.error
   };
+  console.log('【calcAllocRow result】', { fr, br, pr, pctSum: result.pctSum, targetBase, targetBehav, targetPerf,
+    baseCat: { target: baseCat.target, others: baseCat.others, autoVal: baseCat.autoVal, subtotal: baseCat.subtotal, error: baseCat.error },
+    behaviorCat: { target: behaviorCat.target, others: behaviorCat.others, autoVal: behaviorCat.autoVal, subtotal: behaviorCat.subtotal, error: behaviorCat.error },
+    performanceCat: { target: performanceCat.target, others: performanceCat.others, autoVal: performanceCat.autoVal, subtotal: performanceCat.subtotal, error: performanceCat.error }
+  });
+  return result;
 }
 
 function emptyRow() {
@@ -441,6 +447,7 @@ function _step3HTML() {
           ${catKeys.map(cat => {
             const c = r[cat + 'Cat'];
             const pctVal = { base: r.fr, behavior: r.br, performance: r.pr }[cat];
+            console.log('【_step3HTML render input】', { deptId: d.id, idx: ai, grade: a.grade, title: a.title, cat, pctVal, source_fr: r.fr, source_br: r.br, source_pr: r.pr });
             const targetVal = { base: r.targetBase, behavior: r.targetBehav, performance: r.targetPerf }[cat];
             const monthlyVal = { base: r.monthlyBase, behavior: r.monthlyBehavior, performance: r.monthlyPerf }[cat];
             const template = data.deptConfigs[d.id]?.subjects || {};
@@ -450,7 +457,12 @@ function _step3HTML() {
             return `<div class="alloc-card alloc-card-${cat}"${c.error ? ' style="border-color:#ef4444;background:#fef2f2;"' : ''}>
               <div style="font-weight:600;color:${catColors[cat]};margin-bottom:4px;display:flex;align-items:center;gap:4px;font-size:13px;">
                 ${catLabels[cat]}
-                <input type="number" value="${pctVal}" min="0" max="100" style="width:40px;padding:1px 4px;border:1px solid #e2e8f0;border-radius:3px;font-size:11px;text-align:center;" oninput="window.distribAllocPct('${d.id}',${ai},'${cat}',this.value)">
+                <input type="number" value="${pctVal}" min="0" max="100"
+                  data-debug-dept="${d.id}"
+                  data-debug-idx="${ai}"
+                  data-debug-ratio="${cat}"
+                  style="width:40px;padding:1px 4px;border:1px solid #e2e8f0;border-radius:3px;font-size:11px;text-align:center;"
+                  oninput="window.distribAllocPct('${d.id}',${ai},'${cat}',this.value)">
                 <span style="font-size:11px;font-weight:400;color:#64748b;">%</span>
               </div>
               <div style="font-size:11px;color:#64748b;margin-bottom:6px;">
@@ -622,9 +634,12 @@ function _dbRender() { clearTimeout(_debounceTimer); _debounceTimer = setTimeout
 window.distribAllocPct = function(deptId, idx, cat, pctVal) {
   const alloc = data.deptConfigs[deptId]?.gradeAllocation;
   if (!alloc || !alloc[idx]) return;
+  const a = alloc[idx];
+  const before = { fr: a.fixedRatio, br: a.behaviorRatio, pr: a.performanceRatio };
   const pct = Math.min(100, Math.max(0, parseInt(pctVal) || 0));
   const map = { base: 'fixedRatio', behavior: 'behaviorRatio', performance: 'performanceRatio' };
-  alloc[idx][map[cat]] = pct;
+  a[map[cat]] = pct;
+  console.log('【distribAllocPct #1 (NEW)】', { deptId, idx, cat, pctVal, pct, before, after: { fr: a.fixedRatio, br: a.behaviorRatio, pr: a.performanceRatio } });
   save();
   _dbRender();
 };
@@ -662,9 +677,11 @@ window.distribAllocPct = function(deptId, idx, cat, pctVal) {
   const alloc = data.deptConfigs[deptId]?.gradeAllocation;
   if (!alloc || !alloc[idx]) return;
   const a = alloc[idx];
+  const before = { fr: a.fixedRatio, br: a.behaviorRatio, pr: a.performanceRatio };
   const pct = Math.min(100, Math.max(0, parseInt(pctVal) || 0));
   const monthlyTotal = Math.round(a.annualTotal * pct / 100 / 12);
   const items = a.subjects?.[cat];
+  console.log('【distribAllocPct #2 (OLD)】', { deptId, idx, cat, pctVal, pct, before, hasItems: !!(items && items.length), monthlyTotal });
   if (!items || !items.length) {
     if (!a.subjects) a.subjects = { base: [], behavior: [], performance: [] };
     if (!a.subjects[cat]) a.subjects[cat] = [];
@@ -675,6 +692,7 @@ window.distribAllocPct = function(deptId, idx, cat, pctVal) {
     const each = Math.round(monthlyTotal / items.length);
     items.forEach((item, i) => { item.monthly = i === items.length - 1 ? monthlyTotal - each * (items.length - 1) : each; });
   }
+  console.log('【distribAllocPct #2 after】', { fixedRatio: a.fixedRatio, subjects: JSON.parse(JSON.stringify(a.subjects)) });
   save();
   renderStepContent();
 };
@@ -976,7 +994,59 @@ function step5HTML() {
   </div>${snapRows}`;
 }
 
-// ── Snapshots ──
+// ── Debug: tets alloction ──
+window.debugSalaryAlloc = function(deptId, idx) {
+  const depts = getDepts();
+  if (!deptId && depts.length) deptId = depts[0].id;
+  const cfg = data.deptConfigs[deptId];
+  if (!cfg) { console.log('【debugSalaryAlloc】No config for', deptId); return; }
+  const alloc = cfg.gradeAllocation;
+  if (!alloc || !alloc.length) { console.log('【debugSalaryAlloc】No gradeAllocation for', deptId); return; }
+  if (idx === undefined) {
+    console.log('【debugSalaryAlloc】All rows for', deptId);
+    alloc.forEach((a, i) => window.debugSalaryAlloc(deptId, i));
+    return;
+  }
+  const a = alloc[idx];
+  console.log('【debugSalaryAlloc】Row', idx, 'for', deptId);
+  console.log('  data.deptConfigs entry:', JSON.parse(JSON.stringify(a)));
+  console.log('  calcAllocRow result:', calcAllocRow(a));
+  const saved = JSON.parse(localStorage.getItem('salary_v2'));
+  const savedRow = saved?.deptConfigs?.[deptId]?.gradeAllocation?.[idx];
+  console.log('  localStorage entry:', savedRow ? JSON.parse(JSON.stringify(savedRow)) : 'NOT FOUND');
+};
+
+window.testSetRatio = function(deptId, idx) {
+  const alloc = data.deptConfigs[deptId]?.gradeAllocation;
+  if (!alloc || !alloc[idx]) { console.log('【testSetRatio】not found', deptId, idx); return; }
+  const a = alloc[idx];
+  console.log('【testSetRatio BEFORE】', { fixedRatio: a.fixedRatio, behaviorRatio: a.behaviorRatio, performanceRatio: a.performanceRatio, subjects: JSON.parse(JSON.stringify(a.subjects)) });
+  a.fixedRatio = 30;
+  a.behaviorRatio = 10;
+  a.performanceRatio = 50;
+  console.log('【testSetRatio AFTER data】', { fixedRatio: a.fixedRatio, behaviorRatio: a.behaviorRatio, performanceRatio: a.performanceRatio });
+  save();
+  renderStepContent();
+  setTimeout(() => {
+    const baseInput = document.querySelector(`[data-debug-dept="${deptId}"][data-debug-idx="${idx}"][data-debug-ratio="base"]`);
+    const behavInput = document.querySelector(`[data-debug-dept="${deptId}"][data-debug-idx="${idx}"][data-debug-ratio="behavior"]`);
+    const perfInput = document.querySelector(`[data-debug-dept="${deptId}"][data-debug-idx="${idx}"][data-debug-ratio="performance"]`);
+    const saved = JSON.parse(localStorage.getItem('salary_v2'));
+    const savedRow = saved?.deptConfigs?.[deptId]?.gradeAllocation?.[idx];
+    const r = calcAllocRow(a);
+    console.log('【testSetRatio DOM values】', {
+      dom_fixed: baseInput ? baseInput.value : 'NOT FOUND',
+      dom_behavior: behavInput ? behavInput.value : 'NOT FOUND',
+      dom_performance: perfInput ? perfInput.value : 'NOT FOUND'
+    });
+    console.log('【testSetRatio 4-layer】', {
+      dataState: { fr: a.fixedRatio, br: a.behaviorRatio, pr: a.performanceRatio },
+      localStorage: savedRow ? { fr: savedRow.fixedRatio, br: savedRow.behaviorRatio, pr: savedRow.performanceRatio } : 'NOT FOUND',
+      calcAllocRow: { fr: r.fr, br: r.br, pr: r.pr },
+      dom: { base: baseInput?.value, behavior: behavInput?.value, performance: perfInput?.value }
+    });
+  }, 500);
+};
 function getSnapshots() {
   try { return JSON.parse(localStorage.getItem('salary_snapshots') || '[]'); } catch { return []; }
 }
