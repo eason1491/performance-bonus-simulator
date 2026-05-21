@@ -1047,21 +1047,33 @@ window.delDeptGradeLevelConfirm = function(deptId, grade, idx) {
   if (!entry || !entry.levels[idx]) return;
   const level = entry.levels[idx].level;
   const refs = countGradeRefs(deptId, grade, level);
-  let msg = `確定刪除 ${grade}等 ${level}級？`;
-  if (refs > 0) msg += `\n⚠ 目前有 ${refs} 個職位使用此級距，刪除後 Tab1 將顯示「級距缺失」。`;
+  let msg = '';
+  if (refs > 0) msg = `⚠ 目前有 ${refs} 人引用此職級（${grade}等 ${level}級）\n\n`;
+  msg += `確定刪除 ${grade}等 ${level}級？\n刪除後無法復原。${refs > 0 ? '\n\nTab1 將顯示「級距缺失」。' : ''}`;
   if (!confirm(msg)) return;
   entry.levels.splice(idx, 1);
-  save(); renderStepContent();
+  save();
+  if (entry.levels.length === 0) {
+    if (confirm(`${grade}等已無任何職級，是否一併刪除該職等？`)) {
+      data.deptGradeMatrix[deptId] = data.deptGradeMatrix[deptId].filter(g => g.grade !== grade);
+      save();
+    }
+  }
+  window.showDeptGradeEditor(deptId);
+  renderStepContent();
 };
 
 window.delDeptGradeRowConfirm = function(deptId, grade) {
   if (!data.deptGradeMatrix?.[deptId]) return;
   const refs = countGradeRefs(deptId, grade);
-  let msg = `確定刪除 ${grade}等（所有職級）？`;
-  if (refs > 0) msg += `\n⚠ 目前有 ${refs} 個職位使用此級距，刪除後 Tab1 將顯示「級距缺失」。`;
+  let msg = '';
+  if (refs > 0) msg = `⚠ 目前有 ${refs} 人引用此職等（${grade}等）\n\n`;
+  msg += `確定刪除 ${grade}等（包含底下所有職級）？\n刪除後無法復原。${refs > 0 ? '\n\nTab1 將顯示「級距缺失」。' : ''}`;
   if (!confirm(msg)) return;
   data.deptGradeMatrix[deptId] = data.deptGradeMatrix[deptId].filter(g => g.grade !== grade);
-  save(); renderStepContent();
+  save();
+  window.showDeptGradeEditor(deptId);
+  renderStepContent();
 };
 
 // ── Step 4 Tab 2: Dept grade matrix CRUD ──
