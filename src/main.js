@@ -81,9 +81,29 @@ function migrateData() {
 }
 
 function getCheckBasisForDept(dept) {
-  // 檢核基準：決定哪些科目納入級距檢核金額，依部門類型可自訂調整
   if (dept.type === '上山型') return ['fixed', 'behavior', 'performanceTarget'];
   return ['fixed', 'behavior'];
+}
+
+function formatCheckBasis(keys) {
+  const map = { fixed: '固定', behavior: '行為', performanceTarget: '目標績效' };
+  return keys.map(k => map[k] || k).join(' + ');
+}
+
+function roundSalary(n) { return Math.round((n || 0) / 100) * 100; }
+
+function ensureDeptGradeLevel(deptId, grade, level) {
+  if (!data.deptGradeMatrix) data.deptGradeMatrix = {};
+  if (!Array.isArray(data.deptGradeMatrix[deptId])) return null;
+  let g = data.deptGradeMatrix[deptId].find(x => x.grade === grade);
+  if (!g) return null;
+  let l = g.levels.find(x => x.level === level);
+  if (!l) {
+    const last = g.levels[g.levels.length - 1] || { min: 30000, max: 35000 };
+    l = { level, min: roundSalary(last.min + 2000), max: roundSalary(last.max + 3000) };
+    g.levels.push(l);
+  }
+  return l;
 }
 
 function save() {
@@ -833,7 +853,8 @@ function _step4Tab1(activeDepts) {
   let rows = [];
   activeDepts.forEach(d => {
     const alloc = data.deptConfigs[d.id].gradeAllocation || [];
-    const deptGrades = data.deptGradeMatrix?.[d.id] || [];
+    if (!data.deptGradeMatrix) data.deptGradeMatrix = {};
+    const deptGrades = Array.isArray(data.deptGradeMatrix[d.id]) ? data.deptGradeMatrix[d.id] : [];
     alloc.forEach(a => {
       const r = calcAllocRow(a);
       const basis = getCheckBasisForDept(d);
@@ -855,14 +876,14 @@ function _step4Tab1(activeDepts) {
       } else {
         status = '超出級距'; statusColor = '#ef4444';
       }
-      rows.push({ d, a, r, checkAmount, minV, maxV, status, statusColor, basisLabel: basis.join('+') });
+      rows.push({ d, a, r, checkAmount, minV, maxV, status, statusColor, basisLabel: formatCheckBasis(basis), deptGrades, gradeEntry });
     });
   });
 
   if (!rows.length) return '<div class="empty">尚無部門資料</div>';
 
   const tableRows = rows.map(row => {
-    const st = row.status;
+    const missingGrade = (!row.gradeEntry || !row.gradeEntry.levels.find(l => l.level === row.a.level));
     return `<tr style="border-bottom:1px solid #f1f5f9;">
       <td style="padding:4px 8px;font-size:12px;">${row.d.name}</td>
       <td style="padding:4px 8px;font-size:12px;">${row.a.title || ''}</td>
@@ -876,7 +897,10 @@ function _step4Tab1(activeDepts) {
       <td class="r" style="padding:4px 8px;font-size:12px;font-weight:600;">NT$ ${row.checkAmount.toLocaleString()}</td>
       <td class="r" style="padding:4px 8px;font-size:12px;color:#64748b;">${row.minV !== undefined ? 'NT$ '+row.minV.toLocaleString() : '—'}</td>
       <td class="r" style="padding:4px 8px;font-size:12px;color:#64748b;">${row.maxV !== undefined ? 'NT$ '+row.maxV.toLocaleString() : '—'}</td>
-      <td style="padding:4px 8px;font-size:12px;"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-weight:600;color:#fff;background:${row.statusColor};">${row.status}</span></td>
+      <td style="padding:4px 8px;font-size:12px;">
+        <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-weight:600;color:#fff;background:${row.statusColor};">${row.status}</span>
+        ${missingGrade ? `<button class="btn" style="font-size:9px;padding:1px 6px;margin-left:4px;" onclick="window.addDeptGradeRow('${row.d.id}')">建立級距草稿</button>` : ''}
+      </td>
     </tr>`;
   }).join('');
 
@@ -920,32 +944,31 @@ function _step4Tab2(activeDepts) {
   </div>`;
 
   const gradeRows = grades.map(g => {
-    const minV = g.levels.length ? g.levels.reduce((m, l) => Math.min(m, l.min), Infinity) : 0;
-    const maxV = g.levels.length ? g.levels.reduce((m, l) => Math.max(m, l.max), 0) : 0;
-    const mid = (minV + maxV) / 2;
-    const rw = minV > 0 ? Math.round((maxV - minV) / minV * 100) : 0;
-
-    const lvlHtml = g.levels.map((l, li) => `
-      <tr>
+    const lvlHtml = g.levels.map((l, li) => {
+      const minV = l.min, maxV = l.max;
+      const mid = Math.round((minV + maxV) / 2);
+      const rw = minV > 0 ? Math.round((maxV - minV) / minV * 100) : 0;
+      return `<tr>
         <td style="padding:4px 6px;font-size:12px;border-bottom:1px solid #f1f5f9;">${li === 0 ? `<input value="${g.title}" style="width:80px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeTitle('${targetId}',${g.grade},this.value)">` : ''}</td>
         <td style="padding:4px 6px;font-size:12px;text-align:center;border-bottom:1px solid #f1f5f9;">${li === 0 ? `<span style="background:#e8eaf6;padding:2px 8px;border-radius:4px;font-weight:600;">${g.grade}等</span>` : ''}</td>
         <td style="padding:4px 6px;text-align:center;border-bottom:1px solid #f1f5f9;"><input type="number" value="${l.level}" style="width:36px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;" onchange="window.updDeptGradeLevel('${targetId}',${g.grade},${li},this.value)"></td>
         <td style="padding:4px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${l.min}" style="width:70px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeMin('${targetId}',${g.grade},${li},this.value)"></td>
         <td style="padding:4px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${l.max}" style="width:70px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeMax('${targetId}',${g.grade},${li},this.value)"></td>
-        <td style="padding:4px 6px;font-size:12px;text-align:right;border-bottom:1px solid #f1f5f9;">NT$ ${mid.toLocaleString()}</td>
-        <td style="padding:4px 6px;font-size:12px;text-align:right;border-bottom:1px solid #f1f5f9;">${rw}%</td>
+        <td style="padding:4px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${mid}" style="width:70px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeMid('${targetId}',${g.grade},${li},this.value)"></td>
+        <td style="padding:4px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${rw}" min="0" max="200" style="width:55px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeWidth('${targetId}',${g.grade},${li},this.value)"></td>
         <td style="padding:4px 6px;border-bottom:1px solid #f1f5f9;">
           ${li === 0 && g.levels.length > 1 ? `<button class="btn" style="font-size:9px;padding:1px 6px;" onclick="window.addDeptGradeLevel('${targetId}',${g.grade})">＋</button>` : ''}
           ${g.levels.length > 1 && li === g.levels.length - 1 ? `<button class="btn" style="font-size:9px;padding:1px 6px;color:#ef4444;" onclick="window.delDeptGradeLevel('${targetId}',${g.grade},${li})">✕</button>` : ''}
         </td>
-      </tr>`);
-    return lvlHtml + (grades.indexOf(g) < grades.length - 1 ? '' : '');
+      </tr>`;
+    });
+    return lvlHtml.join('');
   }).join('');
 
   return `${selector}
     <table class="r-table" style="font-size:12px;">
       <thead><tr>
-        <th>職稱</th><th>職等</th><th>職級</th><th>下限</th><th>上限</th><th class="r">中點</th><th class="r">薪幅%</th><th></th>
+        <th>職稱</th><th>職等</th><th>職級</th><th>下限</th><th>上限</th><th>中點</th><th>薪幅%</th><th></th>
       </tr></thead>
       <tbody>${gradeRows}</tbody>
     </table>`;
@@ -960,22 +983,44 @@ window.updDeptGradeTitle = function(deptId, grade, val) {
 window.updDeptGradeLevel = function(deptId, grade, idx, val) {
   if (!data.deptGradeMatrix?.[deptId]) return;
   const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
-  if (entry && entry.levels[idx]) { entry.levels[idx].level = Math.max(0, parseInt(val) || 0); save(); }
+  if (entry && entry.levels[idx]) { entry.levels[idx].level = Math.max(0, parseInt(val) || 0); save(); renderStepContent(); }
 };
 window.updDeptGradeMin = function(deptId, grade, idx, val) {
   if (!data.deptGradeMatrix?.[deptId]) return;
   const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
-  if (entry && entry.levels[idx]) { entry.levels[idx].min = Math.max(0, parseInt(val) || 0); save(); }
+  if (entry && entry.levels[idx]) { entry.levels[idx].min = roundSalary(parseInt(val) || 0); save(); }
 };
 window.updDeptGradeMax = function(deptId, grade, idx, val) {
   if (!data.deptGradeMatrix?.[deptId]) return;
   const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
-  if (entry && entry.levels[idx]) { entry.levels[idx].max = Math.max(0, parseInt(val) || 0); save(); }
+  if (entry && entry.levels[idx]) { entry.levels[idx].max = roundSalary(parseInt(val) || 0); save(); }
+};
+window.updDeptGradeMid = function(deptId, grade, idx, val) {
+  if (!data.deptGradeMatrix?.[deptId]) return;
+  const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
+  if (!entry || !entry.levels[idx]) return;
+  const l = entry.levels[idx];
+  const mid = parseInt(val) || 0;
+  const rw = l.min > 0 ? (l.max - l.min) / l.min : 0.3;
+  l.min = roundSalary(mid / (1 + rw / 2));
+  l.max = roundSalary(l.min * (1 + rw));
+  save(); renderStepContent();
+};
+window.updDeptGradeWidth = function(deptId, grade, idx, val) {
+  if (!data.deptGradeMatrix?.[deptId]) return;
+  const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
+  if (!entry || !entry.levels[idx]) return;
+  const l = entry.levels[idx];
+  const rw = (parseInt(val) || 0) / 100;
+  const mid = (l.min + l.max) / 2;
+  l.min = roundSalary(mid / (1 + rw / 2));
+  l.max = roundSalary(l.min * (1 + rw));
+  save(); renderStepContent();
 };
 window.addDeptGradeLevel = function(deptId, grade) {
   if (!data.deptGradeMatrix?.[deptId]) return;
   const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
-  if (entry) { const last = entry.levels[entry.levels.length - 1] || { min: 30000, max: 35000 }; entry.levels.push({ level: (last.level || 0) + 1, min: last.min + 2000, max: last.max + 3000 }); save(); renderStepContent(); }
+  if (entry) { const last = entry.levels[entry.levels.length - 1] || { min: 30000, max: 35000 }; entry.levels.push({ level: (last.level || 0) + 1, min: roundSalary(last.min + 2000), max: roundSalary(last.max + 3000) }); save(); renderStepContent(); }
 };
 window.delDeptGradeLevel = function(deptId, grade, idx) {
   if (!data.deptGradeMatrix?.[deptId]) return;
@@ -984,14 +1029,22 @@ window.delDeptGradeLevel = function(deptId, grade, idx) {
 };
 window.addDeptGradeRow = function(deptId) {
   if (!data.deptGradeMatrix) data.deptGradeMatrix = {};
-  if (!data.deptGradeMatrix[deptId]) data.deptGradeMatrix[deptId] = [];
-  const arr = data.deptGradeMatrix[deptId];
-  if (arr.length) {
-    const last = arr[arr.length - 1];
-    arr.push({ grade: last.grade + 1, title: `職等${last.grade + 1}`, levels: [{ level: 1, min: last.levels[0]?.min + 3000 || 33000, max: last.levels[0]?.max + 5000 || 40000 }] });
-  } else {
-    arr.push({ grade: 1, title: '新職等', levels: [{ level: 1, min: 30000, max: 35000 }] });
+  if (!Array.isArray(data.deptGradeMatrix[deptId]) || data.deptGradeMatrix[deptId].length === 0) {
+    const dd = getDepts().find(x => x.id === deptId);
+    const jf = dd ? getJobFamilyForDept(dd.type) : '管理系';
+    data.deptGradeMatrix[deptId] = JSON.parse(JSON.stringify(
+      (data.gradeMatrix || DEFAULT_GRADE_MATRIX)[jf] || DEFAULT_GRADE_MATRIX['管理系']
+    ));
   }
+  const arr = data.deptGradeMatrix[deptId];
+  const last = arr[arr.length - 1];
+  const baseMin = last?.levels[0]?.min || 30000;
+  const baseMax = last?.levels[0]?.max || 35000;
+  arr.push({
+    grade: last ? last.grade + 1 : 1,
+    title: `職等${last ? last.grade + 1 : 1}`,
+    levels: [{ level: 1, min: roundSalary(baseMin + 3000), max: roundSalary(baseMax + 5000) }]
+  });
   save(); renderStepContent();
 };
 
