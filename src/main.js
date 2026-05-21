@@ -992,10 +992,19 @@ function countGradeRefs(deptId, grade, level) {
   return count;
 }
 
+function refreshDeptGradeEditor(deptId) {
+  renderStepContent();
+  if (document.querySelector('[data-dept-grade-editor="true"]')) {
+    showDeptGradeEditor(deptId);
+  }
+}
+
 window.showDeptGradeEditor = function(deptId) {
-  window.closeAllModals();
+  document.querySelectorAll('[data-dept-grade-editor="true"]').forEach(el => el.remove());
+  document.querySelectorAll('[data-modal-overlay]').forEach(el => { if (!el.hasAttribute('data-dept-grade-editor')) el.remove(); });
   const bg = document.createElement('div');
   bg.setAttribute('data-modal-overlay', '');
+  bg.setAttribute('data-dept-grade-editor', 'true');
   bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;';
   bg.onclick = e => { if (e.target === bg) window.closeAllModals(); };
   const d = getDepts().find(x => x.id === deptId);
@@ -1075,8 +1084,7 @@ window.delDeptGradeLevelConfirm = function(deptId, grade, idx) {
       save();
     }
   }
-  window.showDeptGradeEditor(deptId);
-  renderStepContent();
+  refreshDeptGradeEditor(deptId);
 };
 
 window.delDeptGradeRowConfirm = function(deptId, grade) {
@@ -1088,30 +1096,29 @@ window.delDeptGradeRowConfirm = function(deptId, grade) {
   if (!confirm(msg)) return;
   data.deptGradeMatrix[deptId] = data.deptGradeMatrix[deptId].filter(g => g.grade !== grade);
   save();
-  window.showDeptGradeEditor(deptId);
-  renderStepContent();
+  refreshDeptGradeEditor(deptId);
 };
 
 // ── Step 4 Tab 2: Dept grade matrix CRUD ──
 window.updDeptGradeTitle = function(deptId, grade, val) {
   if (!data.deptGradeMatrix?.[deptId]) return;
   const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
-  if (entry) { entry.title = val; save(); }
+  if (entry) { entry.title = val; save(); refreshDeptGradeEditor(deptId); }
 };
 window.updDeptGradeLevel = function(deptId, grade, idx, val) {
   if (!data.deptGradeMatrix?.[deptId]) return;
   const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
-  if (entry && entry.levels[idx]) { entry.levels[idx].level = Math.max(0, parseInt(val) || 0); save(); renderStepContent(); }
+  if (entry && entry.levels[idx]) { entry.levels[idx].level = Math.max(0, parseInt(val) || 0); save(); refreshDeptGradeEditor(deptId); }
 };
 window.updDeptGradeMin = function(deptId, grade, idx, val) {
   if (!data.deptGradeMatrix?.[deptId]) return;
   const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
-  if (entry && entry.levels[idx]) { entry.levels[idx].min = roundSalary(parseInt(val) || 0); save(); }
+  if (entry && entry.levels[idx]) { entry.levels[idx].min = roundSalary(parseInt(val) || 0); save(); renderStepContent(); }
 };
 window.updDeptGradeMax = function(deptId, grade, idx, val) {
   if (!data.deptGradeMatrix?.[deptId]) return;
   const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
-  if (entry && entry.levels[idx]) { entry.levels[idx].max = roundSalary(parseInt(val) || 0); save(); }
+  if (entry && entry.levels[idx]) { entry.levels[idx].max = roundSalary(parseInt(val) || 0); save(); renderStepContent(); }
 };
 window.updDeptGradeMid = function(deptId, grade, idx, val) {
   if (!data.deptGradeMatrix?.[deptId]) return;
@@ -1122,7 +1129,7 @@ window.updDeptGradeMid = function(deptId, grade, idx, val) {
   const rw = l.min > 0 ? (l.max - l.min) / l.min : 0.3;
   l.min = roundSalary(mid / (1 + rw / 2));
   l.max = roundSalary(l.min * (1 + rw));
-  save(); renderStepContent();
+  save(); refreshDeptGradeEditor(deptId);
 };
 window.updDeptGradeWidth = function(deptId, grade, idx, val) {
   if (!data.deptGradeMatrix?.[deptId]) return;
@@ -1133,12 +1140,12 @@ window.updDeptGradeWidth = function(deptId, grade, idx, val) {
   const mid = (l.min + l.max) / 2;
   l.min = roundSalary(mid / (1 + rw / 2));
   l.max = roundSalary(l.min * (1 + rw));
-  save(); renderStepContent();
+  save(); refreshDeptGradeEditor(deptId);
 };
 window.addDeptGradeLevel = function(deptId, grade) {
   if (!data.deptGradeMatrix?.[deptId]) return;
   const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
-  if (entry) { const last = entry.levels[entry.levels.length - 1] || { min: 30000, max: 35000 }; entry.levels.push({ level: (last.level || 0) + 1, min: roundSalary(last.min + 2000), max: roundSalary(last.max + 3000) }); save(); renderStepContent(); }
+  if (entry) { const last = entry.levels[entry.levels.length - 1] || { min: 30000, max: 35000 }; entry.levels.push({ level: (last.level || 0) + 1, min: roundSalary(last.min + 2000), max: roundSalary(last.max + 3000) }); save(); refreshDeptGradeEditor(deptId); }
 };
 window.delDeptGradeLevel = function(deptId, grade, idx) {
   if (!data.deptGradeMatrix?.[deptId]) return;
@@ -1163,7 +1170,7 @@ window.addDeptGradeRow = function(deptId) {
     title: `職等${last ? last.grade + 1 : 1}`,
     levels: [{ level: 1, min: roundSalary(baseMin + 3000), max: roundSalary(baseMax + 5000) }]
   });
-  save(); renderStepContent();
+  save(); refreshDeptGradeEditor(deptId);
 };
 
 // ── Step 5: Report ──
