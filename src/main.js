@@ -350,8 +350,9 @@ window.updS2HC = function(deptId, val) {
 // ── Department Management Modal ──
 window.showDeptModal = function() {
   const bg = document.createElement('div');
+  bg.setAttribute('data-modal-overlay', '');
   bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;';
-  bg.onclick = e => { if (e.target === bg) bg.remove(); };
+  bg.onclick = e => { if (e.target === bg) window.closeAllModals(); };
   const depts = data.departments;
   const rows = depts.map(d => {
     const tClass = d.type === '上山型' ? 'up' : d.type === '平路型' ? 'flat' : 'down';
@@ -364,7 +365,8 @@ window.showDeptModal = function() {
     </tr>`;
   }).join('');
   bg.innerHTML = `<div style="background:#fff;border-radius:12px;padding:28px;min-width:580px;max-width:700px;box-shadow:0 20px 60px rgba(0,0,0,.2);" onclick="event.stopPropagation()">
-    <h3 style="margin-bottom:16px;font-size:16px;font-weight:700;">管理部門</h3>
+    <h3 style="margin-bottom:16px;font-size:16px;font-weight:700;">管理部門
+    <button type="button" class="btn" onclick="window.closeAllModals()" style="float:right;font-size:18px;padding:2px 12px;line-height:1;">✕</button></h3>
     <table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="border-bottom:2px solid #e2e8f0;"><th style="text-align:left;padding:8px;">部門名稱</th><th style="text-align:left;padding:8px;">型態</th><th style="padding:8px;"></th><th style="padding:8px;"></th><th style="padding:8px;"></th></tr></thead><tbody>${rows}</tbody></table>
     <div style="margin-top:12px;display:flex;gap:8px;"><select id="newDeptType" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:6px;">${JOB_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}</select><button class="btn-primary" onclick="window.addDept()">＋ 新增部門</button></div>
     <div style="margin-top:16px;text-align:right;"><button class="btn-primary btn-modal-done">完成</button></div>
@@ -392,8 +394,9 @@ window.addDept = function() {
 // ── Department Sort Modal ──
 window.showDeptSortModal = function() {
   const bg = document.createElement('div');
+  bg.setAttribute('data-modal-overlay', '');
   bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;';
-  bg.onclick = e => { if (e.target === bg) bg.remove(); };
+  bg.onclick = e => { if (e.target === bg) window.closeAllModals(); };
   const depts = data.departments;
   let items = depts.map(d =>
     `<div class="sort-item" data-id="${d.id}" draggable="true" style="padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:grab;display:flex;align-items:center;gap:10px;font-size:14px;">
@@ -401,7 +404,7 @@ window.showDeptSortModal = function() {
     </div>`
   ).join('');
   bg.innerHTML = `<div style="background:#fff;border-radius:12px;padding:28px;min-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.2);" onclick="event.stopPropagation()">
-    <h3 style="margin-bottom:12px;font-size:16px;font-weight:700;">拖曳調整部門順序</h3>
+    <h3 style="margin-bottom:12px;font-size:16px;font-weight:700;">拖曳調整部門順序<button type="button" class="btn" onclick="window.closeAllModals()" style="float:right;font-size:18px;padding:2px 12px;line-height:1;">✕</button></h3>
     <div id="sortContainer">${items}</div>
     <div style="margin-top:16px;text-align:right;"><button class="btn-primary btn-modal-done">完成</button></div>
   </div>`;
@@ -639,14 +642,18 @@ function findGradeForSal(salary) {
     : { grade: first ? first.grade : 0, title: first ? first.title : '', level: '↓', ok: false };
 }
 
+// ── Unified Modal Close + Esc ──
+window.closeAllModals = function() {
+  document.querySelectorAll('[data-modal-overlay]').forEach(el => el.remove());
+  document.body.style.overflow = '';
+};
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') window.closeAllModals();
+});
+
 // ── Step 3 Allocation Row Management ──
 window._expanded = {};
-window.closeModal = function(btn) {
-  let el = btn;
-  while (el && !(el.tagName === 'DIV' && el.style.position === 'fixed')) el = el.parentElement;
-  if (el) el.remove();
-  setTimeout(() => { try { window.save(); window.render(); } catch(e) { console.error(e); location.reload(); } }, 30);
-};
 
 window.toggleAlloc = function(deptId, idx) {
   const key = `${deptId}_${idx}`;
@@ -793,10 +800,11 @@ window.showSubjectsEditor = function(deptId) {
     </div>`;
   }).join('');
   const bg = document.createElement('div');
+  bg.setAttribute('data-modal-overlay', '');
   bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;';
-  bg.onclick = e => { if (e.target === bg) bg.remove(); };
+  bg.onclick = e => { if (e.target === bg) window.closeAllModals(); };
   bg.innerHTML = `<div style="background:#fff;border-radius:12px;padding:28px;min-width:520px;max-width:600px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);" onclick="event.stopPropagation()">
-    <h3 style="margin-bottom:16px;font-size:16px;font-weight:700;">✏ 編輯科目 — ${d ? d.name : ''}</h3>
+    <h3 style="margin-bottom:16px;font-size:16px;font-weight:700;">✏ 編輯科目 — ${d ? d.name : ''}<button type="button" class="btn" onclick="window.closeAllModals()" style="float:right;font-size:18px;padding:2px 12px;line-height:1;">✕</button></h3>
     <p style="font-size:12px;color:#64748b;margin-bottom:12px;">編輯科目名稱，實際金額在各職等展開列中調整。分紅/福利為外加（視公司盈餘發放）。</p>
     ${html}
     <div style="margin-top:16px;text-align:right;"><button class="btn-primary btn-modal-done">完成</button></div>
@@ -976,12 +984,11 @@ function countGradeRefs(deptId, grade, level) {
 }
 
 window.showDeptGradeEditor = function(deptId) {
-  const oldOverlay = document.querySelector('[data-overlay="dept-grade-editor"]');
-  if (oldOverlay) oldOverlay.remove();
+  window.closeAllModals();
   const bg = document.createElement('div');
-  bg.setAttribute('data-overlay', 'dept-grade-editor');
+  bg.setAttribute('data-modal-overlay', '');
   bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;';
-  bg.onclick = e => { if (e.target === bg) bg.remove(); };
+  bg.onclick = e => { if (e.target === bg) window.closeAllModals(); };
   const d = getDepts().find(x => x.id === deptId);
   const grades = (data.deptGradeMatrix?.[deptId]) || [];
 
@@ -1031,7 +1038,7 @@ window.showDeptGradeEditor = function(deptId) {
       <h3 style="font-size:16px;font-weight:700;">📊 編輯職等職級表 — ${d ? d.name : ''}</h3>
       <div style="display:flex;gap:6px;">
         <button class="btn" onclick="window.addDeptGradeRow('${deptId}')">＋ 新增職等</button>
-        <button class="btn" onclick="bg.remove();" style="font-size:18px;padding:2px 8px;line-height:1;">✕</button>
+        <button type="button" class="btn" onclick="window.closeAllModals()" style="font-size:18px;padding:2px 8px;line-height:1;">✕</button>
       </div>
     </div>
     <div style="background:#f0f9ff;padding:8px 12px;border-radius:8px;margin-bottom:16px;font-size:11px;color:#1e40af;">
@@ -1314,12 +1321,11 @@ window.updGradeMatrix = function(family, grade, lvlIdx, field, val) {
 window.showGradeMatrixEditor = function() {
   const matrix = data.gradeMatrix || DEFAULT_GRADE_MATRIX;
   const families = JOB_FAMILIES.filter(f => matrix[f] && matrix[f].length > 0);
-  const oldOverlay = document.querySelector('[data-overlay="grade-editor"]');
-  if (oldOverlay) oldOverlay.remove();
+  window.closeAllModals();
   const bg = document.createElement('div');
-  bg.setAttribute('data-overlay', 'grade-editor');
+  bg.setAttribute('data-modal-overlay', '');
   bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;';
-  bg.onclick = e => { if (e.target === bg) { bg.remove(); } };
+  bg.onclick = e => { if (e.target === bg) window.closeAllModals(); };
   const famHtml = families.map(family => {
     const grades = matrix[family];
     const pm = FAMILY_PAYMIX[family] || {};
@@ -1369,7 +1375,7 @@ window.showGradeMatrixEditor = function() {
       <h3 style="font-size:16px;font-weight:700;">📊 編輯職等職級對照表</h3>
       <div style="display:flex;gap:6px;">
         <button class="btn" onclick="window.addJobFamily()">＋ 新增職系</button>
-        <button class="btn" id="gradeEditorClose" style="font-size:18px;padding:2px 12px;line-height:1;">✕</button>
+        <button type="button" class="btn" onclick="window.closeAllModals()" style="font-size:18px;padding:2px 12px;line-height:1;">✕</button>
       </div>
     </div>
     <div style="background:#f0f9ff;padding:8px 12px;border-radius:8px;margin-bottom:16px;font-size:11px;color:#1e40af;">每個職系獨立編輯。帶寬建議：基層20-30%、中階30-40%、高階40-60%。</div>
@@ -1382,12 +1388,6 @@ window.showGradeMatrixEditor = function() {
     save();
     render();
   };
-  document.getElementById('gradeEditorClose').onclick = function() {
-    bg.remove();
-  };
-  document.addEventListener('keydown', _escHandler = function(e) {
-    if (e.key === 'Escape') { bg.remove(); document.removeEventListener('keydown', _escHandler); }
-  });
 };
 
 window.updGradeTitle = function(family, grade, val) {
