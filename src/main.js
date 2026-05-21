@@ -1,4 +1,4 @@
-import { signInWithGoogle, signOut, onAuthChange, getCurrentUser, savePlan as supabaseSave } from './auth.js';
+﻿import { signInWithGoogle, signOut, onAuthChange, getCurrentUser, savePlan as supabaseSave } from './auth.js';
 import { INDUSTRIES, DEPT_TYPE, DEPT_SUBJECTS, INDUSTRY_BENCHMARKS, JOB_TYPES, TYPE_RATIOS, TYPE_SUBJECTS, DEFAULT_GRADES, JOB_FAMILIES, DEFAULT_GRADE_MATRIX, FAMILY_PAYMIX, DEPT_JOB_FAMILY, ALL_DEPTS, getIndustryDepts, genDeptId, isKnownDept, getDeptRatios, getDeptSubjects, createDeptConfig, calcHealth, parseRange, defaultData, createDefaultAllocation, getJobFamilyForDept } from './data.js';
 
 let curUser = null;
@@ -673,104 +673,6 @@ window.delAllocSubj = function(deptId, idx, cat, si) {
   renderStepContent();
 };
 
-window.distribAllocPct = function(deptId, idx, cat, pctVal) {
-  const alloc = data.deptConfigs[deptId]?.gradeAllocation;
-  if (!alloc || !alloc[idx]) return;
-  const a = alloc[idx];
-  const before = { fr: a.fixedRatio, br: a.behaviorRatio, pr: a.performanceRatio };
-  const pct = Math.min(100, Math.max(0, parseInt(pctVal) || 0));
-  const monthlyTotal = Math.round(a.annualTotal * pct / 100 / 12);
-  const items = a.subjects?.[cat];
-  console.log('【distribAllocPct #2 (OLD)】', { deptId, idx, cat, pctVal, pct, before, hasItems: !!(items && items.length), monthlyTotal });
-  if (!items || !items.length) {
-    if (!a.subjects) a.subjects = { base: [], behavior: [], performance: [] };
-    if (!a.subjects[cat]) a.subjects[cat] = [];
-    a.subjects[cat].push({ name: cat === 'base' ? '固定薪資' : cat === 'behavior' ? '行為獎金' : '績效獎金', monthly: monthlyTotal });
-  } else if (items.length === 1) {
-    items[0].monthly = monthlyTotal;
-  } else {
-    const each = Math.round(monthlyTotal / items.length);
-    items.forEach((item, i) => { item.monthly = i === items.length - 1 ? monthlyTotal - each * (items.length - 1) : each; });
-  }
-  console.log('【distribAllocPct #2 after】', { fixedRatio: a.fixedRatio, subjects: JSON.parse(JSON.stringify(a.subjects)) });
-  save();
-  renderStepContent();
-};
-
-window.updAllocSubj = function(deptId, idx, cat, si, val) {
-  const alloc = data.deptConfigs[deptId]?.gradeAllocation;
-  if (!alloc || !alloc[idx] || !alloc[idx].subjects || !alloc[idx].subjects[cat]) return;
-  alloc[idx].subjects[cat][si].monthly = Math.max(0, parseInt(val) || 0);
-  save();
-  renderStepContent();
-};
-
-window.addAllocSubj = function(deptId, idx, cat, name) {
-  if (!name || name === '' || name === '__custom__') { name = prompt('請輸入科目名稱：'); if (!name) return; }
-  const alloc = data.deptConfigs[deptId]?.gradeAllocation;
-  if (!alloc || !alloc[idx]) return;
-  if (!alloc[idx].subjects) alloc[idx].subjects = { base: [], behavior: [], performance: [] };
-  if (!alloc[idx].subjects[cat]) alloc[idx].subjects[cat] = [];
-  alloc[idx].subjects[cat].push({ name, monthly: 0 });
-  save();
-  renderStepContent();
-};
-
-window.delAllocSubj = function(deptId, idx, cat, si) {
-  const alloc = data.deptConfigs[deptId]?.gradeAllocation;
-  if (!alloc || !alloc[idx] || !alloc[idx].subjects || !alloc[idx].subjects[cat]) return;
-  alloc[idx].subjects[cat].splice(si, 1);
-  save();
-  renderStepContent();
-};
-
-window.updAllocSubj = function(deptId, idx, cat, si, field, val) {
-  const alloc = data.deptConfigs[deptId]?.gradeAllocation;
-  if (!alloc || !alloc[idx] || !alloc[idx].subjects || !alloc[idx].subjects[cat]) return;
-  alloc[idx].subjects[cat][si][field] = field === 'amount' ? (parseInt(val) || 0) : val;
-  save();
-};
-
-window.addAllocSubj = function(deptId, idx, cat, name) {
-  if (!name || name === '' || name === '__custom__') {
-    name = prompt('請輸入科目名稱：');
-    if (!name) return;
-  }
-  const alloc = data.deptConfigs[deptId]?.gradeAllocation;
-  if (!alloc || !alloc[idx]) return;
-  const a = alloc[idx];
-  if (!a.subjects) a.subjects = { base: [], behavior: [], performance: [] };
-  if (!a.subjects[cat]) a.subjects[cat] = [];
-  const subjName = name || '新科目';
-  const total = { base: a.fixedAnnual, behavior: a.behaviorAnnual, performance: a.perfAnnual }[cat];
-  a.subjects[cat].push({ name: subjName, amount: 0 });
-  // Redistribute amounts
-  const items = a.subjects[cat];
-  if (items.length > 1) {
-    const each = Math.round(total / items.length);
-    items.forEach((item, i) => { item.amount = i === items.length - 1 ? total - each * (items.length - 1) : each; });
-  } else {
-    items[0].amount = total;
-  }
-  save();
-  renderStepContent();
-};
-
-window.delAllocSubj = function(deptId, idx, cat, si) {
-  const alloc = data.deptConfigs[deptId]?.gradeAllocation;
-  if (!alloc || !alloc[idx] || !alloc[idx].subjects || !alloc[idx].subjects[cat]) return;
-  const a = alloc[idx];
-  a.subjects[cat].splice(si, 1);
-  // Redistribute amounts
-  const total = { base: a.fixedAnnual, behavior: a.behaviorAnnual, performance: a.perfAnnual }[cat];
-  const items = a.subjects[cat];
-  if (items && items.length) {
-    const each = Math.round(total / items.length);
-    items.forEach((item, i) => { item.amount = i === items.length - 1 ? total - each * (items.length - 1) : each; });
-  }
-  save();
-  renderStepContent();
-};
 
 window.addAllocRow = function(deptId) {
   const alloc = data.deptConfigs[deptId]?.gradeAllocation;
