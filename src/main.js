@@ -447,7 +447,6 @@ function _step3HTML() {
           ${catKeys.map(cat => {
             const c = r[cat + 'Cat'];
             const pctVal = { base: r.fr, behavior: r.br, performance: r.pr }[cat];
-            console.log('【_step3HTML render input】', { deptId: d.id, idx: ai, grade: a.grade, title: a.title, cat, pctVal, source_fr: r.fr, source_br: r.br, source_pr: r.pr });
             const targetVal = { base: r.targetBase, behavior: r.targetBehav, performance: r.targetPerf }[cat];
             const monthlyVal = { base: r.monthlyBase, behavior: r.monthlyBehavior, performance: r.monthlyPerf }[cat];
             const template = data.deptConfigs[d.id]?.subjects || {};
@@ -462,7 +461,8 @@ function _step3HTML() {
                   data-debug-idx="${ai}"
                   data-debug-ratio="${cat}"
                   style="width:40px;padding:1px 4px;border:1px solid #e2e8f0;border-radius:3px;font-size:11px;text-align:center;"
-                  oninput="window.distribAllocPct('${d.id}',${ai},'${cat}',this.value)">
+                  oninput="window.updateAllocPctDraft('${d.id}',${ai},'${cat}',this.value)"
+                  onblur="window.commitAllocPct('${d.id}',${ai},'${cat}',this.value)">
                 <span style="font-size:11px;font-weight:400;color:#64748b;">%</span>
               </div>
               <div style="font-size:11px;color:#64748b;margin-bottom:6px;">
@@ -628,20 +628,24 @@ window.updAllocCell = function(deptId, idx, field, val) {
   renderStepContent();
 };
 
-let _debounceTimer;
-function _dbRender() { clearTimeout(_debounceTimer); _debounceTimer = setTimeout(() => { renderStepContent(); }, 200); }
+// ── Ratio input: draft on input, commit on blur ──
+window.updateAllocPctDraft = function(deptId, idx, cat, pctVal) {
+  const alloc = data.deptConfigs[deptId]?.gradeAllocation;
+  if (!alloc || !alloc[idx]) return;
+  const pct = Math.min(100, Math.max(0, parseInt(pctVal) || 0));
+  const map = { base: 'fixedRatio', behavior: 'behaviorRatio', performance: 'performanceRatio' };
+  alloc[idx][map[cat]] = pct;
+};
 
-window.distribAllocPct = function(deptId, idx, cat, pctVal) {
+window.commitAllocPct = function(deptId, idx, cat, pctVal) {
   const alloc = data.deptConfigs[deptId]?.gradeAllocation;
   if (!alloc || !alloc[idx]) return;
   const a = alloc[idx];
-  const before = { fr: a.fixedRatio, br: a.behaviorRatio, pr: a.performanceRatio };
   const pct = Math.min(100, Math.max(0, parseInt(pctVal) || 0));
   const map = { base: 'fixedRatio', behavior: 'behaviorRatio', performance: 'performanceRatio' };
   a[map[cat]] = pct;
-  console.log('【distribAllocPct #1 (NEW)】', { deptId, idx, cat, pctVal, pct, before, after: { fr: a.fixedRatio, br: a.behaviorRatio, pr: a.performanceRatio } });
   save();
-  _dbRender();
+  renderStepContent();
 };
 
 window.updAllocSubj = function(deptId, idx, cat, si, val) {
