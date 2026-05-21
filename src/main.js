@@ -63,6 +63,27 @@ function migrateData() {
     });
   });
   if (changed) save();
+  // Initialize deptGradeMatrix if missing
+  if (!data.deptGradeMatrix) {
+    data.deptGradeMatrix = {};
+    changed = true;
+  }
+  data.departments.forEach(d => {
+    if (!data.deptGradeMatrix[d.id]) {
+      const jf = getJobFamilyForDept(d.type);
+      data.deptGradeMatrix[d.id] = JSON.parse(JSON.stringify(
+        (data.gradeMatrix || DEFAULT_GRADE_MATRIX)[jf] || DEFAULT_GRADE_MATRIX['管理系']
+      ));
+      changed = true;
+    }
+  });
+  if (changed) save();
+}
+
+function getCheckBasisForDept(dept) {
+  // 檢核基準：決定哪些科目納入級距檢核金額，依部門類型可自訂調整
+  if (dept.type === '上山型') return ['fixed', 'behavior', 'performanceTarget'];
+  return ['fixed', 'behavior'];
 }
 
 function save() {
@@ -776,59 +797,203 @@ window.delSubjItem = function(deptId, cat, idx) {
   if (cfg && cfg.subjects && cfg.subjects[cat]) { cfg.subjects[cat].splice(idx, 1); save(); window.showSubjectsEditor(deptId); }
 };
 
-// ── Step 4: Grade Matrix ──
-function step4HTML() {
-  const depts = getDepts();
-  const active = depts.filter(d => data.deptConfigs[d.id] && (data.headcounts[d.id] || 0) > 0);
-  const matrix = data.gradeMatrix || DEFAULT_GRADE_MATRIX;
-  const families = JOB_FAMILIES.filter(f => matrix[f] && matrix[f].length > 0);
+// ── Step 4: Department Grade Matrix (2 tabs) ──
+window._step4Tab = 'tab1';
+window._step4Tab2Dept = null;
 
-  const famTables = families.map(family => {
-    const grades = matrix[family];
-    const pm = FAMILY_PAYMIX[family] || { fixed: 70, float: 30, desc: '' };
-    const rows = grades.map(g => {
-      const lvlRows = g.levels.map((l, li) => {
-        const matched = [];
-        active.forEach(d => {
-          const alloc = data.deptConfigs[d.id]?.gradeAllocation || [];
-          alloc.forEach(a => {
-            if (a.grade === g.grade && a.level === l.level && a.headcount > 0) {
-              matched.push(`${d.name} ${a.headcount}人`);
-            }
-          });
-        });
-        const markerHtml = matched.length ? `<span style="font-size:10px;color:#4338ca;">← ${matched.join('、')}</span>` : '';
-        return `<tr>
-          <td style="padding:4px 8px;font-size:12px;color:#475569;">${li === 0 ? `<strong>${g.title}</strong>` : ''}</td>
-          <td style="padding:4px 8px;font-size:12px;text-align:center;">${li === 0 ? `${g.grade}等` : ''}</td>
-          <td style="padding:4px 8px;font-size:12px;text-align:center;">${l.level}級</td>
-          <td style="padding:4px 8px;font-size:12px;text-align:right;">NT$ ${l.min.toLocaleString()}</td>
-          <td style="padding:4px 8px;font-size:12px;text-align:right;">NT$ ${l.max.toLocaleString()}</td>
-          <td style="padding:4px 8px;font-size:11px;">${markerHtml}</td>
-        </tr>`;
-      }).join('');
-      return lvlRows;
-    }).join('');
-    return `<div class="scard" style="margin-bottom:16px;">
-      <div class="scard-title" style="display:flex;align-items:center;justify-content:space-between;">
-        <span>${family}</span>
-        <span style="font-size:11px;font-weight:400;color:#64748b;">固定 ${pm.fixed}% · 浮動 ${pm.float}% · ${pm.desc}</span>
+window.switchStep4Tab = function(t) {
+  window._step4Tab = t;
+  renderStepContent();
+};
+
+window.switchStep4Dept = function(deptId) {
+  window._step4Tab2Dept = deptId;
+  renderStepContent();
+};
+
+function step4HTML() {
+  const tab = window._step4Tab || 'tab1';
+  const depts = getDepts().filter(d => data.headcounts[d.id] > 0 && data.deptConfigs[d.id]?.gradeAllocation?.length > 0);
+
+  return `<div class="scard" style="margin-bottom:16px;">
+    <div class="scard-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <span>❹ 部門職等職級對照</span>
+      <div style="display:flex;gap:6px;font-size:13px;">
+        <button class="chip ${tab==='tab1'?'active':''}" onclick="window.switchStep4Tab('tab1')">全部門現有職位總表</button>
+        <button class="chip ${tab==='tab2'?'active':''}" onclick="window.switchStep4Tab('tab2')">部門職等職級附表</button>
       </div>
-      <table class="r-table" style="font-size:13px;">
-        <thead><tr><th style="width:20%;">職稱</th><th style="width:50px;">職等</th><th style="width:50px;">職級</th><th style="text-align:right;">下限</th><th style="text-align:right;">上限</th><th style="width:20%;">部門對應</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
-  }).join('');
-  return `<div class="scard">
-    <div class="scard-title" style="display:flex;align-items:center;justify-content:space-between;">
-      <span>❹ 職等職級對照</span>
-      <button class="btn" onclick="window.showGradeMatrixEditor()">✏ 編輯所有級距</button>
     </div>
-    <div class="scard-desc"><strong>職等</strong>（Grade）= 責任權限 · <strong>職級</strong>（Step）= 熟練度。各部門配置人數自動對應。</div>
-    ${famTables}
-  </div>${stepNav('下一步：總覽報表 ›', true)}`;
+    <div class="scard-desc">職等/職級僅作為同部門內部職位序列與薪資級距參考，不作為跨部門位階比較。</div>
+  </div>
+  ${tab === 'tab1' ? _step4Tab1(depts) : _step4Tab2(depts)}
+  ${stepNav('下一步：總覽報表 ›', true)}`;
 }
+
+function _step4Tab1(activeDepts) {
+  let rows = [];
+  activeDepts.forEach(d => {
+    const alloc = data.deptConfigs[d.id].gradeAllocation || [];
+    const deptGrades = data.deptGradeMatrix?.[d.id] || [];
+    alloc.forEach(a => {
+      const r = calcAllocRow(a);
+      const basis = getCheckBasisForDept(d);
+      const ckFixed = basis.includes('fixed') ? r.monthlyBase : 0;
+      const ckBehav = basis.includes('behavior') ? r.monthlyBehavior : 0;
+      const ckPerf = basis.includes('performanceTarget') ? r.monthlyPerf : 0;
+      const checkAmount = ckFixed + ckBehav + ckPerf;
+      const gradeEntry = deptGrades.find(g => g.grade === a.grade);
+      const levelEntry = gradeEntry?.levels.find(l => l.level === a.level);
+      const minV = levelEntry?.min;
+      const maxV = levelEntry?.max;
+      let status, statusColor;
+      if (minV === undefined || maxV === undefined) {
+        status = '級距缺失'; statusColor = '#94a3b8';
+      } else if (checkAmount < minV) {
+        status = '低於級距'; statusColor = '#f59e0b';
+      } else if (checkAmount <= maxV) {
+        status = '符合'; statusColor = '#10b981';
+      } else {
+        status = '超出級距'; statusColor = '#ef4444';
+      }
+      rows.push({ d, a, r, checkAmount, minV, maxV, status, statusColor, basisLabel: basis.join('+') });
+    });
+  });
+
+  if (!rows.length) return '<div class="empty">尚無部門資料</div>';
+
+  const tableRows = rows.map(row => {
+    const st = row.status;
+    return `<tr style="border-bottom:1px solid #f1f5f9;">
+      <td style="padding:4px 8px;font-size:12px;">${row.d.name}</td>
+      <td style="padding:4px 8px;font-size:12px;">${row.a.title || ''}</td>
+      <td style="padding:4px 8px;font-size:12px;text-align:center;">${row.a.grade}等</td>
+      <td style="padding:4px 8px;font-size:12px;text-align:center;">${row.a.level}級</td>
+      <td style="padding:4px 8px;font-size:12px;text-align:center;">${row.a.headcount}</td>
+      <td class="r" style="padding:4px 8px;font-size:12px;">NT$ ${row.r.monthlyBase.toLocaleString()}</td>
+      <td class="r" style="padding:4px 8px;font-size:12px;">NT$ ${row.r.monthlyBehavior.toLocaleString()}</td>
+      <td class="r" style="padding:4px 8px;font-size:12px;">NT$ ${row.r.monthlyPerf.toLocaleString()}</td>
+      <td style="padding:4px 8px;font-size:11px;">${row.basisLabel}</td>
+      <td class="r" style="padding:4px 8px;font-size:12px;font-weight:600;">NT$ ${row.checkAmount.toLocaleString()}</td>
+      <td class="r" style="padding:4px 8px;font-size:12px;color:#64748b;">${row.minV !== undefined ? 'NT$ '+row.minV.toLocaleString() : '—'}</td>
+      <td class="r" style="padding:4px 8px;font-size:12px;color:#64748b;">${row.maxV !== undefined ? 'NT$ '+row.maxV.toLocaleString() : '—'}</td>
+      <td style="padding:4px 8px;font-size:12px;"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-weight:600;color:#fff;background:${row.statusColor};">${row.status}</span></td>
+    </tr>`;
+  }).join('');
+
+  return `<table class="r-table" style="font-size:12px;">
+    <thead><tr>
+      <th>部門</th><th>職稱</th><th>職等</th><th>職級</th><th>人數</th>
+      <th class="r">固定月薪</th><th class="r">行為月薪</th><th class="r">績效月均</th>
+      <th>檢核基準</th><th class="r">檢核金額</th><th class="r">級距下限</th><th class="r">級距上限</th><th>狀態</th>
+    </tr></thead>
+    <tbody>${tableRows}</tbody>
+  </table>`;
+}
+
+function _step4Tab2(activeDepts) {
+  if (!activeDepts.length) return '<div class="empty">尚無部門資料</div>';
+  const selId = window._step4Tab2Dept;
+  // Find a valid default
+  let targetId = selId && activeDepts.find(d => d.id === selId) ? selId : activeDepts[0].id;
+  if (!window._step4Tab2Dept || targetId !== selId) {
+    window._step4Tab2Dept = targetId;
+  }
+  const d = activeDepts.find(x => x.id === targetId);
+  if (!d) return '<div class="empty">請選擇部門</div>';
+
+  if (!data.deptGradeMatrix) data.deptGradeMatrix = {};
+  if (!data.deptGradeMatrix[targetId]) {
+    const jf = getJobFamilyForDept(d.type);
+    data.deptGradeMatrix[targetId] = JSON.parse(JSON.stringify(
+      (data.gradeMatrix || DEFAULT_GRADE_MATRIX)[jf] || DEFAULT_GRADE_MATRIX['管理系']
+    ));
+  }
+  const grades = data.deptGradeMatrix[targetId] || [];
+
+  const selector = `<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <span style="font-size:13px;font-weight:600;">選擇部門：</span>
+    <select onchange="window.switchStep4Dept(this.value)" style="padding:6px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px;">
+      ${activeDepts.map(dd => `<option value="${dd.id}" ${dd.id === targetId ? 'selected' : ''}>${dd.name}</option>`).join('')}
+    </select>
+    <button class="btn" style="font-size:11px;" onclick="window.addDeptGradeRow('${targetId}')">＋ 新增職等</button>
+    <button class="btn" style="font-size:11px;" onclick="window.showGradeMatrixEditor()">✏ 編輯職系級距</button>
+  </div>`;
+
+  const gradeRows = grades.map(g => {
+    const minV = g.levels.length ? g.levels.reduce((m, l) => Math.min(m, l.min), Infinity) : 0;
+    const maxV = g.levels.length ? g.levels.reduce((m, l) => Math.max(m, l.max), 0) : 0;
+    const mid = (minV + maxV) / 2;
+    const rw = minV > 0 ? Math.round((maxV - minV) / minV * 100) : 0;
+
+    const lvlHtml = g.levels.map((l, li) => `
+      <tr>
+        <td style="padding:4px 6px;font-size:12px;border-bottom:1px solid #f1f5f9;">${li === 0 ? `<input value="${g.title}" style="width:80px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeTitle('${targetId}',${g.grade},this.value)">` : ''}</td>
+        <td style="padding:4px 6px;font-size:12px;text-align:center;border-bottom:1px solid #f1f5f9;">${li === 0 ? `<span style="background:#e8eaf6;padding:2px 8px;border-radius:4px;font-weight:600;">${g.grade}等</span>` : ''}</td>
+        <td style="padding:4px 6px;text-align:center;border-bottom:1px solid #f1f5f9;"><input type="number" value="${l.level}" style="width:36px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;" onchange="window.updDeptGradeLevel('${targetId}',${g.grade},${li},this.value)"></td>
+        <td style="padding:4px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${l.min}" style="width:70px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeMin('${targetId}',${g.grade},${li},this.value)"></td>
+        <td style="padding:4px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${l.max}" style="width:70px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeMax('${targetId}',${g.grade},${li},this.value)"></td>
+        <td style="padding:4px 6px;font-size:12px;text-align:right;border-bottom:1px solid #f1f5f9;">NT$ ${mid.toLocaleString()}</td>
+        <td style="padding:4px 6px;font-size:12px;text-align:right;border-bottom:1px solid #f1f5f9;">${rw}%</td>
+        <td style="padding:4px 6px;border-bottom:1px solid #f1f5f9;">
+          ${li === 0 && g.levels.length > 1 ? `<button class="btn" style="font-size:9px;padding:1px 6px;" onclick="window.addDeptGradeLevel('${targetId}',${g.grade})">＋</button>` : ''}
+          ${g.levels.length > 1 && li === g.levels.length - 1 ? `<button class="btn" style="font-size:9px;padding:1px 6px;color:#ef4444;" onclick="window.delDeptGradeLevel('${targetId}',${g.grade},${li})">✕</button>` : ''}
+        </td>
+      </tr>`);
+    return lvlHtml + (grades.indexOf(g) < grades.length - 1 ? '' : '');
+  }).join('');
+
+  return `${selector}
+    <table class="r-table" style="font-size:12px;">
+      <thead><tr>
+        <th>職稱</th><th>職等</th><th>職級</th><th>下限</th><th>上限</th><th class="r">中點</th><th class="r">薪幅%</th><th></th>
+      </tr></thead>
+      <tbody>${gradeRows}</tbody>
+    </table>`;
+}
+
+// ── Step 4 Tab 2: Dept grade matrix CRUD ──
+window.updDeptGradeTitle = function(deptId, grade, val) {
+  if (!data.deptGradeMatrix?.[deptId]) return;
+  const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
+  if (entry) { entry.title = val; save(); }
+};
+window.updDeptGradeLevel = function(deptId, grade, idx, val) {
+  if (!data.deptGradeMatrix?.[deptId]) return;
+  const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
+  if (entry && entry.levels[idx]) { entry.levels[idx].level = Math.max(0, parseInt(val) || 0); save(); }
+};
+window.updDeptGradeMin = function(deptId, grade, idx, val) {
+  if (!data.deptGradeMatrix?.[deptId]) return;
+  const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
+  if (entry && entry.levels[idx]) { entry.levels[idx].min = Math.max(0, parseInt(val) || 0); save(); }
+};
+window.updDeptGradeMax = function(deptId, grade, idx, val) {
+  if (!data.deptGradeMatrix?.[deptId]) return;
+  const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
+  if (entry && entry.levels[idx]) { entry.levels[idx].max = Math.max(0, parseInt(val) || 0); save(); }
+};
+window.addDeptGradeLevel = function(deptId, grade) {
+  if (!data.deptGradeMatrix?.[deptId]) return;
+  const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
+  if (entry) { const last = entry.levels[entry.levels.length - 1] || { min: 30000, max: 35000 }; entry.levels.push({ level: (last.level || 0) + 1, min: last.min + 2000, max: last.max + 3000 }); save(); renderStepContent(); }
+};
+window.delDeptGradeLevel = function(deptId, grade, idx) {
+  if (!data.deptGradeMatrix?.[deptId]) return;
+  const entry = data.deptGradeMatrix[deptId].find(g => g.grade === grade);
+  if (entry && entry.levels.length > 1) { entry.levels.splice(idx, 1); save(); renderStepContent(); }
+};
+window.addDeptGradeRow = function(deptId) {
+  if (!data.deptGradeMatrix) data.deptGradeMatrix = {};
+  if (!data.deptGradeMatrix[deptId]) data.deptGradeMatrix[deptId] = [];
+  const arr = data.deptGradeMatrix[deptId];
+  if (arr.length) {
+    const last = arr[arr.length - 1];
+    arr.push({ grade: last.grade + 1, title: `職等${last.grade + 1}`, levels: [{ level: 1, min: last.levels[0]?.min + 3000 || 33000, max: last.levels[0]?.max + 5000 || 40000 }] });
+  } else {
+    arr.push({ grade: 1, title: '新職等', levels: [{ level: 1, min: 30000, max: 35000 }] });
+  }
+  save(); renderStepContent();
+};
 
 // ── Step 5: Report ──
 function step5HTML() {

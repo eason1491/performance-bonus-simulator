@@ -411,9 +411,10 @@ export function defaultData(ind) {
   return {
     industry: ind, departments: depts, monthlyRevenue: 500,
     laborRatio: Math.round((range.min + range.max) / 2),
-    headcounts: hc, deptConfigs: {},
+    headcounts: hc,     deptConfigs: {},
     grades: JSON.parse(JSON.stringify(DEFAULT_GRADES)),
     gradeMatrix: JSON.parse(JSON.stringify(DEFAULT_GRADE_MATRIX)),
+    deptGradeMatrix: {},
     activeJobFamily: '管理系', step: 1, planName: '未命名方案', planId: null
   };
 }
