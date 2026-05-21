@@ -917,11 +917,8 @@ function _step4Tab1(activeDepts) {
 function _step4Tab2(activeDepts) {
   if (!activeDepts.length) return '<div class="empty">尚無部門資料</div>';
   const selId = window._step4Tab2Dept;
-  // Find a valid default
   let targetId = selId && activeDepts.find(d => d.id === selId) ? selId : activeDepts[0].id;
-  if (!window._step4Tab2Dept || targetId !== selId) {
-    window._step4Tab2Dept = targetId;
-  }
+  if (!window._step4Tab2Dept || targetId !== selId) { window._step4Tab2Dept = targetId; }
   const d = activeDepts.find(x => x.id === targetId);
   if (!d) return '<div class="empty">請選擇部門</div>';
 
@@ -939,40 +936,133 @@ function _step4Tab2(activeDepts) {
     <select onchange="window.switchStep4Dept(this.value)" style="padding:6px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px;">
       ${activeDepts.map(dd => `<option value="${dd.id}" ${dd.id === targetId ? 'selected' : ''}>${dd.name}</option>`).join('')}
     </select>
-    <button class="btn" style="font-size:11px;" onclick="window.addDeptGradeRow('${targetId}')">＋ 新增職等</button>
-    <button class="btn" style="font-size:11px;" onclick="window.showGradeMatrixEditor()">✏ 編輯職系級距</button>
+    <button class="btn" style="font-size:11px;" onclick="window.showDeptGradeEditor('${targetId}')">✏ 編輯職等職級表</button>
   </div>`;
 
   const gradeRows = grades.map(g => {
-    const lvlHtml = g.levels.map((l, li) => {
-      const minV = l.min, maxV = l.max;
-      const mid = Math.round((minV + maxV) / 2);
-      const rw = minV > 0 ? Math.round((maxV - minV) / minV * 100) : 0;
+    const lvlRows = g.levels.map(l => {
+      const mid = Math.round((l.min + l.max) / 2);
+      const rw = l.min > 0 ? Math.round((l.max - l.min) / l.min * 100) : 0;
       return `<tr>
-        <td style="padding:4px 6px;font-size:12px;border-bottom:1px solid #f1f5f9;">${li === 0 ? `<input value="${g.title}" style="width:80px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeTitle('${targetId}',${g.grade},this.value)">` : ''}</td>
-        <td style="padding:4px 6px;font-size:12px;text-align:center;border-bottom:1px solid #f1f5f9;">${li === 0 ? `<span style="background:#e8eaf6;padding:2px 8px;border-radius:4px;font-weight:600;">${g.grade}等</span>` : ''}</td>
-        <td style="padding:4px 6px;text-align:center;border-bottom:1px solid #f1f5f9;"><input type="number" value="${l.level}" style="width:36px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;" onchange="window.updDeptGradeLevel('${targetId}',${g.grade},${li},this.value)"></td>
-        <td style="padding:4px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${l.min}" style="width:70px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeMin('${targetId}',${g.grade},${li},this.value)"></td>
-        <td style="padding:4px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${l.max}" style="width:70px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeMax('${targetId}',${g.grade},${li},this.value)"></td>
-        <td style="padding:4px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${mid}" style="width:70px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeMid('${targetId}',${g.grade},${li},this.value)"></td>
-        <td style="padding:4px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${rw}" min="0" max="200" style="width:55px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeWidth('${targetId}',${g.grade},${li},this.value)"></td>
-        <td style="padding:4px 6px;border-bottom:1px solid #f1f5f9;">
-          ${li === 0 && g.levels.length > 1 ? `<button class="btn" style="font-size:9px;padding:1px 6px;" onclick="window.addDeptGradeLevel('${targetId}',${g.grade})">＋</button>` : ''}
-          ${g.levels.length > 1 && li === g.levels.length - 1 ? `<button class="btn" style="font-size:9px;padding:1px 6px;color:#ef4444;" onclick="window.delDeptGradeLevel('${targetId}',${g.grade},${li})">✕</button>` : ''}
-        </td>
+        <td style="padding:4px 6px;font-size:12px;border-bottom:1px solid #f1f5f9;">${g.title}</td>
+        <td style="padding:4px 6px;font-size:12px;text-align:center;border-bottom:1px solid #f1f5f9;">${g.grade}等</td>
+        <td style="padding:4px 6px;font-size:12px;text-align:center;border-bottom:1px solid #f1f5f9;">${l.level}級</td>
+        <td style="padding:4px 6px;font-size:12px;text-align:right;border-bottom:1px solid #f1f5f9;">NT$ ${l.min.toLocaleString()}</td>
+        <td style="padding:4px 6px;font-size:12px;text-align:right;border-bottom:1px solid #f1f5f9;">NT$ ${l.max.toLocaleString()}</td>
+        <td style="padding:4px 6px;font-size:12px;text-align:right;border-bottom:1px solid #f1f5f9;">NT$ ${mid.toLocaleString()}</td>
+        <td style="padding:4px 6px;font-size:12px;text-align:right;border-bottom:1px solid #f1f5f9;">${rw}%</td>
       </tr>`;
-    });
-    return lvlHtml.join('');
+    }).join('');
+    return lvlRows;
   }).join('');
 
   return `${selector}
     <table class="r-table" style="font-size:12px;">
       <thead><tr>
-        <th>職稱</th><th>職等</th><th>職級</th><th>下限</th><th>上限</th><th>中點</th><th>薪幅%</th><th></th>
+        <th>職稱</th><th>職等</th><th>職級</th><th class="r">下限</th><th class="r">上限</th><th class="r">中點</th><th class="r">薪幅%</th>
       </tr></thead>
       <tbody>${gradeRows}</tbody>
     </table>`;
 }
+
+function countGradeRefs(deptId, grade, level) {
+  let count = 0;
+  (data.deptConfigs[deptId]?.gradeAllocation || []).forEach(a => {
+    if (a.grade === grade && (level === undefined || a.level === level)) {
+      count += Number(a.headcount) || 0;
+    }
+  });
+  return count;
+}
+
+window.showDeptGradeEditor = function(deptId) {
+  const oldOverlay = document.querySelector('[data-overlay="dept-grade-editor"]');
+  if (oldOverlay) oldOverlay.remove();
+  const bg = document.createElement('div');
+  bg.setAttribute('data-overlay', 'dept-grade-editor');
+  bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;';
+  bg.onclick = e => { if (e.target === bg) bg.remove(); };
+  const d = getDepts().find(x => x.id === deptId);
+  const grades = (data.deptGradeMatrix?.[deptId]) || [];
+
+  const famHtml = grades.map(g => {
+    const refs = countGradeRefs(deptId, g.grade);
+    const lvlHtml = g.levels.map((l, li) => {
+      const lRefs = countGradeRefs(deptId, g.grade, l.level);
+      const mid = Math.round((l.min + l.max) / 2);
+      const rw = l.min > 0 ? Math.round((l.max - l.min) / l.min * 100) : 0;
+      return `<tr>
+        <td style="padding:3px 6px;font-size:12px;border-bottom:1px solid #f1f5f9;text-align:center;"><input type="number" value="${l.level}" style="width:36px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;" onchange="window.updDeptGradeLevel('${deptId}',${g.grade},${li},this.value)"></td>
+        <td style="padding:3px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${l.min}" style="width:65px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeMin('${deptId}',${g.grade},${li},this.value)"></td>
+        <td style="padding:3px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${l.max}" style="width:65px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeMax('${deptId}',${g.grade},${li},this.value)"></td>
+        <td style="padding:3px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${mid}" style="width:65px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeMid('${deptId}',${g.grade},${li},this.value)"></td>
+        <td style="padding:3px 6px;border-bottom:1px solid #f1f5f9;"><input type="number" value="${rw}" min="0" max="200" style="width:50px;padding:3px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;" onchange="window.updDeptGradeWidth('${deptId}',${g.grade},${li},this.value)"></td>
+        <td style="padding:3px 6px;border-bottom:1px solid #f1f5f9;text-align:center;">
+          ${g.levels.length > 1 ? `<button class="btn" style="font-size:9px;padding:1px 6px;color:#ef4444;" onclick="window.delDeptGradeLevelConfirm('${deptId}',${g.grade},${li})">✕</button>` : ''}
+        </td>
+      </tr>`;
+    }).join('');
+
+    return `<div style="margin-bottom:16px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+      <div style="background:#f8fafc;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e2e8f0;">
+        <strong style="font-size:14px;">${g.title} — ${g.grade}等</strong>
+        <span style="font-size:11px;color:#64748b;">${refs > 0 ? `${refs}個職位引用` : '無引用'}</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="border-bottom:2px solid #e2e8f0;">
+          <th style="padding:3px 6px;font-size:11px;">職級</th>
+          <th style="padding:3px 6px;font-size:11px;">下限</th>
+          <th style="padding:3px 6px;font-size:11px;">上限</th>
+          <th style="padding:3px 6px;font-size:11px;">中點</th>
+          <th style="padding:3px 6px;font-size:11px;">薪幅%</th>
+          <th style="padding:3px 6px;font-size:11px;"></th>
+        </tr></thead>
+        <tbody>${lvlHtml}</tbody>
+      </table>
+      <div style="padding:4px 8px;border-top:1px solid #e2e8f0;display:flex;gap:6px;">
+        <button class="btn" style="font-size:10px;padding:2px 8px;" onclick="window.addDeptGradeLevel('${deptId}',${g.grade})">＋ 新增職級</button>
+        <button class="btn" style="font-size:10px;padding:2px 8px;color:#ef4444;" onclick="window.delDeptGradeRowConfirm('${deptId}',${g.grade})">🗑 刪除職等</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  bg.innerHTML = `<div style="background:#fff;border-radius:12px;padding:24px;min-width:700px;max-width:800px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <h3 style="font-size:16px;font-weight:700;">📊 編輯職等職級表 — ${d ? d.name : ''}</h3>
+      <div style="display:flex;gap:6px;">
+        <button class="btn" onclick="window.addDeptGradeRow('${deptId}')">＋ 新增職等</button>
+        <button class="btn" onclick="bg.remove();" style="font-size:18px;padding:2px 8px;line-height:1;">✕</button>
+      </div>
+    </div>
+    <div style="background:#f0f9ff;padding:8px 12px;border-radius:8px;margin-bottom:16px;font-size:11px;color:#1e40af;">
+      中點與薪幅%可自動計算或手動調整。下線/上限修改後自動更新中點與薪幅。
+    </div>
+    ${famHtml || '<div class="empty">尚無職等資料，請點「新增職等」建立。</div>'}
+  </div>`;
+  document.body.appendChild(bg);
+};
+
+window.delDeptGradeLevelConfirm = function(deptId, grade, idx) {
+  const entry = data.deptGradeMatrix?.[deptId]?.find(g => g.grade === grade);
+  if (!entry || !entry.levels[idx]) return;
+  const level = entry.levels[idx].level;
+  const refs = countGradeRefs(deptId, grade, level);
+  let msg = `確定刪除 ${grade}等 ${level}級？`;
+  if (refs > 0) msg += `\n⚠ 目前有 ${refs} 個職位使用此級距，刪除後 Tab1 將顯示「級距缺失」。`;
+  if (!confirm(msg)) return;
+  entry.levels.splice(idx, 1);
+  save(); renderStepContent();
+};
+
+window.delDeptGradeRowConfirm = function(deptId, grade) {
+  if (!data.deptGradeMatrix?.[deptId]) return;
+  const refs = countGradeRefs(deptId, grade);
+  let msg = `確定刪除 ${grade}等（所有職級）？`;
+  if (refs > 0) msg += `\n⚠ 目前有 ${refs} 個職位使用此級距，刪除後 Tab1 將顯示「級距缺失」。`;
+  if (!confirm(msg)) return;
+  data.deptGradeMatrix[deptId] = data.deptGradeMatrix[deptId].filter(g => g.grade !== grade);
+  save(); renderStepContent();
+};
 
 // ── Step 4 Tab 2: Dept grade matrix CRUD ──
 window.updDeptGradeTitle = function(deptId, grade, val) {
