@@ -999,7 +999,7 @@ window.showGradeMatrixEditor = function() {
   const bg = document.createElement('div');
   bg.setAttribute('data-overlay', 'grade-editor');
   bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;';
-  bg.onclick = e => { if (e.target === bg) { bg.remove(); save(); render(); } };
+  bg.onclick = e => { if (e.target === bg) { bg.remove(); } };
   const famHtml = families.map(family => {
     const grades = matrix[family];
     const pm = FAMILY_PAYMIX[family] || {};
@@ -1049,7 +1049,7 @@ window.showGradeMatrixEditor = function() {
       <h3 style="font-size:16px;font-weight:700;">📊 編輯職等職級對照表</h3>
       <div style="display:flex;gap:6px;">
         <button class="btn" onclick="window.addJobFamily()">＋ 新增職系</button>
-        <button class="btn" onclick="bg.remove();save();render();" style="font-size:18px;padding:2px 12px;line-height:1;">✕</button>
+        <button class="btn" id="gradeEditorClose" style="font-size:18px;padding:2px 12px;line-height:1;">✕</button>
       </div>
     </div>
     <div style="background:#f0f9ff;padding:8px 12px;border-radius:8px;margin-bottom:16px;font-size:11px;color:#1e40af;">每個職系獨立編輯。帶寬建議：基層20-30%、中階30-40%、高階40-60%。</div>
@@ -1062,6 +1062,12 @@ window.showGradeMatrixEditor = function() {
     save();
     render();
   };
+  document.getElementById('gradeEditorClose').onclick = function() {
+    bg.remove();
+  };
+  document.addEventListener('keydown', _escHandler = function(e) {
+    if (e.key === 'Escape') { bg.remove(); document.removeEventListener('keydown', _escHandler); }
+  });
 };
 
 window.updGradeTitle = function(family, grade, val) {
