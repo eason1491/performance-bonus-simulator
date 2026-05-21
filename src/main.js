@@ -33,6 +33,7 @@ function init() {
 
 function migrateData() {
   if (!data.gradeMatrix) data.gradeMatrix = JSON.parse(JSON.stringify(DEFAULT_GRADE_MATRIX));
+  let changed = false;
   Object.keys(data.deptConfigs || {}).forEach(id => {
     const cfg = data.deptConfigs[id];
     if (cfg && !cfg.gradeAllocation) {
@@ -41,24 +42,27 @@ function migrateData() {
       const alloc = createDefaultAllocation(hc, d ? d.name : '部門', cfg.type || '平路型', data.gradeMatrix);
       if (alloc.length) cfg.gradeAllocation = alloc;
       else cfg.gradeAllocation = [{ grade: -1, level: 1, title: '人員', headcount: hc, annualTotal: cfg.annualTotal || 600000, fixedRatio: 70, behaviorRatio: 10, performanceRatio: 20, subjects: { base: [{ name: '基本薪資', annual: Math.round((cfg.fixedAnnual || 420000) / 12) }], behavior: [{ name: '獎金', annual: Math.round((cfg.behaviorAnnual || 60000) / 12) }], performance: [{ name: '績效', annual: Math.round((cfg.perfAnnual || 120000) / 12) }] } }];
+      changed = true;
     }
-    // Convert old monthly/annual subjects to annual with auto-balance
+    // 補 ratio + 轉 subjects
     (cfg?.gradeAllocation || []).forEach(a => {
+      if (a.fixedRatio === undefined) { a.fixedRatio = 40; changed = true; }
+      if (a.behaviorRatio === undefined) { a.behaviorRatio = 10; changed = true; }
+      if (a.performanceRatio === undefined) { a.performanceRatio = 50; changed = true; }
       ['base','behavior','performance'].forEach(cat => {
-        const items = a.subjects?.[cat];
-        if (!items || !items.length) return;
-        items.forEach((item, i) => {
-          if (item.annual === null) return; // already auto-balance
-          if (item.annual !== undefined) return; // already annual
-          // Convert from monthly or amount
+        (a.subjects?.[cat] || []).forEach(item => {
+          if (item.annual === null) return;
+          if (item.annual !== undefined) return;
           const val = item.monthly !== undefined ? Number(item.monthly) : (item.amount !== undefined ? Math.round(Number(item.amount) / 12) : 0);
           item.annual = val;
           delete item.monthly;
           delete item.amount;
+          changed = true;
         });
       });
     });
   });
+  if (changed) save();
 }
 
 function save() {
@@ -103,42 +107,62 @@ function getDeptBudget(d) {
 
 function calcAllocRow(a) {
   if (!a || typeof a !== 'object') { console.warn('calcAllocRow: invalid input', a); return emptyRow(); }
-  const an = Number(a.annualTotal) || 1;
-  const fr = a.fixedRatio !== undefined ? Number(a.fixedRatio) : 40;
-  const br = a.behaviorRatio !== undefined ? Number(a.behaviorRatio) : 10;
-  const pr = a.performanceRatio !== undefined ? Number(a.performanceRatio) : 50;
-  const targetBase  = Math.round(an * fr / 100);
-  const targetBehav = Math.round(an * br / 100);
-  const targetPerf  = Math.round(an * pr / 100);
+  const packageAnnual = Number(a.annualTotal) || 1;
+  const fr = Number(a.fixedRatio) || 0;
+  const br = Number(a.behaviorRatio) || 0;
+  const pr = Number(a.performanceRatio) || 0;
+  const pctSum = fr + br + pr;
+
+  const targetBase  = Math.round(packageAnnual * fr / 100);
+  const targetBehav = Math.round(packageAnnual * br / 100);
+  const targetPerf  = Math.round(packageAnnual * pr / 100);
 
   const calcCat = (cat, target) => {
     const items = (a.subjects?.[cat] || []);
     const autoIdx = items.findIndex(s => s && s.annual === null);
-    const others = items.reduce((s, item, i) => s + (i !== autoIdx && item ? (Number(item.annual) || 0) : 0), 0);
-    const autoVal = target - others;
-    return { target, others, autoVal, autoIdx, error: autoVal < 0, items };
+    let manualTotal = 0;
+    items.forEach((item, i) => { if (i !== autoIdx && item) manualTotal += (Number(item.annual) || 0); });
+    const autoVal = target - manualTotal;
+    const error = autoVal < 0;
+    return {
+      target, others: manualTotal, autoVal, autoIdx, error, items,
+      subtotal: error ? manualTotal : target,
+      diff: error ? manualTotal - target : 0
+    };
   };
 
   const baseCat = calcCat('base', targetBase);
   const behaviorCat = calcCat('behavior', targetBehav);
   const performanceCat = calcCat('performance', targetPerf);
 
-  const annualTotal = targetBase + targetBehav + targetPerf;
+  const allocatedAnnual = targetBase + targetBehav + targetPerf;
+  const unallocatedAnnual = packageAnnual - allocatedAnnual;
   return {
-    fr, br, pr,
+    fr, br, pr, pctSum,
+    unallocated: pctSum < 100 ? 100 - pctSum : 0,
+    pctOver: pctSum > 100 ? pctSum - 100 : 0,
+    packageAnnual, allocatedAnnual, unallocatedAnnual,
     targetBase, targetBehav, targetPerf,
     monthlyBase: Math.round(targetBase / 12),
     monthlyBehavior: Math.round(targetBehav / 12),
     monthlyPerf: Math.round(targetPerf / 12),
-    monthlyTotal: Math.round(annualTotal / 12),
-    annualTotal,
-    over: annualTotal - an,
+    monthlyTotal: Math.round(allocatedAnnual / 12),
+    over: allocatedAnnual - packageAnnual,
     baseCat, behaviorCat, performanceCat,
     anyError: baseCat.error || behaviorCat.error || performanceCat.error
   };
 }
 
-function emptyRow() { return { fr:0, br:0, pr:0, targetBase:0, targetBehav:0, targetPerf:0, monthlyBase:0, monthlyBehavior:0, monthlyPerf:0, monthlyTotal:0, annualTotal:0, over:0, baseCat:{ target:0, others:0, autoVal:0, autoIdx:-1, error:false, items:[] }, behaviorCat:{ target:0, others:0, autoVal:0, autoIdx:-1, error:false, items:[] }, performanceCat:{ target:0, others:0, autoVal:0, autoIdx:-1, error:false, items:[] }, anyError:false }; }
+function emptyRow() {
+  const e = () => ({ target:0, others:0, autoVal:0, autoIdx:-1, error:false, items:[], subtotal:0, diff:0 });
+  return {
+    fr:0, br:0, pr:0, pctSum:0, unallocated:100, pctOver:0,
+    packageAnnual:0, allocatedAnnual:0, unallocatedAnnual:0,
+    targetBase:0, targetBehav:0, targetPerf:0,
+    monthlyBase:0, monthlyBehavior:0, monthlyPerf:0, monthlyTotal:0,
+    over:0, baseCat:e(), behaviorCat:e(), performanceCat:e(), anyError:false
+  };
+}
 
 function calcAllocSummary(alloc) {
   let totalHC = 0, totalAnnual = 0;
@@ -401,64 +425,72 @@ function _step3HTML() {
       const catColors = { base: '#1a237e', behavior: '#e65100', performance: '#2e7d32' };
       const catTarget = { base: 40, behavior: 10, performance: 50 };
 
-      const detailHtml = isOpen ? `<div class="alloc-detail" style="background:#f8fafc;padding:6px 12px 6px 42px;">
-        ${catKeys.map(cat => {
-          const c = r[cat + 'Cat']; // baseCat, behavCat, perfCat
-          const catPct = { base: r.fr, behavior: r.br, performance: r.pr }[cat];
-          const diff = catPct - catTarget[cat];
-          const template = data.deptConfigs[d.id]?.subjects || {};
-          const templateCats = template[cat] || [];
-          const usedNames = (a.subjects?.[cat] || []).map(s => s.name);
-          const available = templateCats.filter(n => !usedNames.includes(n) && typeof n === 'string');
-          return `<div style="margin-bottom:8px;${c.error ? 'padding:4px;border:1px solid #ef4444;border-radius:4px;background:#fef2f2;' : ''}">
-            <div style="font-size:12px;font-weight:600;color:${catColors[cat]};margin-bottom:4px;display:flex;align-items:center;gap:8px;">
-              <span>${catLabels[cat]}</span>
-              <input type="number" value="${catPct}" min="0" max="100" style="width:45px;padding:1px 4px;border:1px solid #e2e8f0;border-radius:3px;font-size:11px;font-weight:400;text-align:center;" onchange="window.distribAllocPct('${d.id}',${ai},'${cat}',this.value)">
-              <span style="font-size:11px;font-weight:400;color:#64748b;">%</span>
-              <span style="font-size:11px;font-weight:400;color:#64748b;margin-left:4px;">目標 NT$ ${c.target.toLocaleString()}/年（NT$ ${Math.round(c.target / 12).toLocaleString()}/月）</span>
-            </div>
-            ${c.items.length === 0 ? `<div style="font-size:11px;color:#94a3b8;font-style:italic;">（尚無科目）</div>` : ''}
-            ${c.items.map((s, si) => {
-              const isAuto = (si === c.autoIdx);
-              const val = isAuto ? Math.max(0, c.autoVal) : (s.annual !== null ? Number(s.annual) : 0);
-              return `<div style="display:flex;align-items:center;gap:4px;margin:2px 0;font-size:12px;">
-                <span style="${isAuto ? 'color:#94a3b8;' : 'color:#1e293b;'}min-width:70px;${isAuto ? 'font-style:italic;' : ''}">${s.name}${isAuto ? ' ⚙' : ''}</span>
-                ${isAuto
-                  ? `<span style="width:65px;text-align:right;font-size:12px;color:${c.autoVal < 0 ? '#ef4444' : '#1e293b'};padding:2px 4px;">${c.autoVal < 0 ? `⚠ ${c.autoVal.toLocaleString()}` : val.toLocaleString()}</span>`
-                  : `<input type="number" value="${val}" min="0" style="width:65px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:3px;font-size:12px;text-align:right;" onchange="window.updAllocSubj('${d.id}',${ai},'${cat}',${si},this.value)">`
-                }
-                <span style="font-size:11px;color:#94a3b8;">/年</span>
-                <span style="font-size:11px;color:#94a3b8;">月 ${Math.round(val / 12).toLocaleString()}</span>
-                <span style="cursor:pointer;color:#ef4444;font-size:14px;margin-left:4px;" onclick="window.delAllocSubj('${d.id}',${ai},'${cat}',${si})">×</span>
-              </div>`;
-            }).join('')}
-            <div style="margin-top:2px;display:flex;gap:4px;align-items:center;">
-              <select onchange="window.addAllocSubj('${d.id}',${ai},'${cat}',this.value);this.value='';" style="font-size:11px;padding:1px 4px;border:1px solid #e2e8f0;border-radius:3px;">
-                <option value="">＋ 新增科目</option>
-                ${available.map(n => `<option value="${n}">${n}</option>`).join('')}
-                <option value="__custom__">✏ 自訂新科目</option>
-              </select>
-              <span style="font-size:11px;margin-left:auto;color:${c.error ? '#ef4444' : diff > 5 ? '#ef4444' : diff < -5 ? '#f59e0b' : '#10b981'};">
-                小計 NT$ ${c.others.toLocaleString()}/年 · 目標 ${c.target.toLocaleString()}/年（${catPct}%${diff > 0 ? ' ⚠超' : ''}）
-                ${c.error ? ` 🚫 超出 ${Math.abs(c.autoVal).toLocaleString()}` : ` ✅ auto NT$ ${c.autoVal.toLocaleString()}`}
-              </span>
-            </div>
-            ${c.error ? `<div style="font-size:11px;color:#ef4444;margin-top:2px;">🚫 ${catLabels[cat]}科目加總 NT$ ${(c.others + Math.abs(c.autoVal)).toLocaleString()} 超過目標 ${c.target.toLocaleString()}，超出 ${Math.abs(c.autoVal).toLocaleString()}</div>` : ''}
-          </div>`;
-        }).join('')}
-        <div style="border-top:1px solid #e2e8f0;padding-top:6px;margin-top:4px;font-size:12px;">
-          <div style="display:flex;gap:16px;flex-wrap:wrap;font-weight:600;">
-            <span>單人月薪 NT$ ${r.monthlyTotal.toLocaleString()}</span>
-            <span>單人年薪 NT$ ${r.annualTotal.toLocaleString()}</span>
-            <span>人數 × ${a.headcount}</span>
-            <span style="color:#1a237e;">該職等年薪小計 NT$ ${(r.annualTotal * a.headcount).toLocaleString()}</span>
-          </div>
-          <div style="font-size:11px;color:${r.anyError ? '#ef4444' : r.over > 0 ? '#ef4444' : r.over < 0 ? '#10b981' : '#64748b'};margin-top:2px;">
-            ${r.anyError ? '🚫 部分類別科目超出目標' : `目標年薪 ${a.annualTotal.toLocaleString()}/人 ${r.over > 0 ? `⚠ 實計 ${r.annualTotal.toLocaleString()}，超額 ${r.over.toLocaleString()}/人` : r.over < 0 ? `✅ 實計 ${r.annualTotal.toLocaleString()}，餘裕 ${Math.abs(r.over).toLocaleString()}/人` : '持平'}`}
-          </div>
-          <div style="font-size:11px;color:#64748b;margin-top:2px;">
-            固定+行為+績效合計 ${r.fr + r.br + r.pr}%
-          </div>
+      const detailHtml = isOpen ? `<div class="alloc-detail" style="padding:8px 12px;background:#fff;border-top:1px solid #e2e8f0;">
+        <!-- Header -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;font-size:13px;padding-bottom:6px;border-bottom:1px solid #e2e8f0;">
+          <strong>${a.title} ${a.grade}等</strong>
+          <span>人數 ${a.headcount}</span>
+          <span>目標年薪總包 NT$ ${a.annualTotal.toLocaleString()}</span>
+          <span>已配置 NT$ ${r.allocatedAnnual.toLocaleString()}（${r.pctSum}%）</span>
+          <span style="color:${r.pctOver > 0 ? '#ef4444' : r.unallocated > 0 ? '#f59e0b' : '#10b981'};">
+            ${r.pctOver > 0 ? `🚫 超出 ${r.pctOver}%` : r.unallocated > 0 ? `未配置 ${r.unallocated}%（NT$ ${r.unallocatedAnnual.toLocaleString()}）` : '✅ 已配置 100%'}
+          </span>
+        </div>
+        <!-- 3-column cards -->
+        <div class="alloc-detail-grid">
+          ${catKeys.map(cat => {
+            const c = r[cat + 'Cat'];
+            const pctVal = { base: r.fr, behavior: r.br, performance: r.pr }[cat];
+            const targetVal = { base: r.targetBase, behavior: r.targetBehav, performance: r.targetPerf }[cat];
+            const monthlyVal = { base: r.monthlyBase, behavior: r.monthlyBehavior, performance: r.monthlyPerf }[cat];
+            const template = data.deptConfigs[d.id]?.subjects || {};
+            const templateCats = template[cat] || [];
+            const usedNames = (a.subjects?.[cat] || []).map(s => s.name);
+            const available = templateCats.filter(n => !usedNames.includes(n) && typeof n === 'string');
+            return `<div class="alloc-card alloc-card-${cat}"${c.error ? ' style="border-color:#ef4444;background:#fef2f2;"' : ''}>
+              <div style="font-weight:600;color:${catColors[cat]};margin-bottom:4px;display:flex;align-items:center;gap:4px;font-size:13px;">
+                ${catLabels[cat]}
+                <input type="number" value="${pctVal}" min="0" max="100" style="width:40px;padding:1px 4px;border:1px solid #e2e8f0;border-radius:3px;font-size:11px;text-align:center;" oninput="window.distribAllocPct('${d.id}',${ai},'${cat}',this.value)">
+                <span style="font-size:11px;font-weight:400;color:#64748b;">%</span>
+              </div>
+              <div style="font-size:11px;color:#64748b;margin-bottom:6px;">
+                目標 NT$ ${targetVal.toLocaleString()}/年 · NT$ ${monthlyVal.toLocaleString()}/月
+              </div>
+              ${c.items.length === 0 ? `<div style="font-size:11px;color:#94a3b8;font-style:italic;margin-bottom:4px;">（尚無科目）</div>` : ''}
+              ${c.items.map((s, si) => {
+                const isAuto = si === c.autoIdx;
+                const val = isAuto ? c.autoVal : (s.annual || 0);
+                const strVal = typeof s === 'string' ? s : (s.name || '');
+                const displayVal = isAuto ? Math.max(0, c.autoVal) : val;
+                return isAuto
+                  ? `<div class="alloc-auto-item">
+                       <span style="font-size:10px;color:#64748b;">⚙</span>
+                       <span style="color:#64748b;font-style:italic;">${strVal}</span>
+                       <span style="margin-left:auto;font-weight:600;color:${c.error ? '#ef4444' : '#1e293b'};">${c.error ? `⚠ ${c.autoVal.toLocaleString()}` : displayVal.toLocaleString()}</span>
+                     </div>`
+                  : `<div class="alloc-manual-item">
+                       <span style="min-width:50px;font-size:11px;">${strVal}</span>
+                       <input type="number" value="${val}" min="0" style="width:55px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:3px;font-size:11px;text-align:right;" onchange="window.updAllocSubj('${d.id}',${ai},'${cat}',${si},this.value)">
+                       <span style="font-size:10px;color:#94a3b8;">/年</span>
+                       <span style="font-size:10px;color:#94a3b8;">月${Math.round(val/12).toLocaleString()}</span>
+                       <span style="cursor:pointer;color:#ef4444;font-size:14px;" onclick="window.delAllocSubj('${d.id}',${ai},'${cat}',${si})">×</span>
+                     </div>`;
+              }).join('')}
+              <div style="margin-top:4px;">
+                <select onchange="window.addAllocSubj('${d.id}',${ai},'${cat}',this.value);this.value='';" style="font-size:10px;padding:1px 4px;border:1px solid #e2e8f0;border-radius:3px;width:100%;">
+                  <option value="">＋ 新增科目</option>
+                  ${available.map(n => `<option value="${n}">${n}</option>`).join('')}
+                  <option value="__custom__">✏ 自訂</option>
+                </select>
+              </div>
+              <div style="margin-top:4px;padding-top:4px;border-top:1px solid #e2e8f0;font-size:11px;display:flex;justify-content:space-between;">
+                <span>小計 <strong>NT$ ${c.subtotal.toLocaleString()}</strong></span>
+                <span style="color:${c.error ? '#ef4444' : '#10b981'};">
+                  ${c.error ? `🚫 超出 ${c.diff.toLocaleString()}` : `✅ 差 ${c.diff.toLocaleString()}`}
+                </span>
+              </div>
+            </div>`;
+          }).join('')}
         </div>
       </div>` : '';
 
@@ -466,7 +498,7 @@ function _step3HTML() {
         const c = r[cat + 'Cat'];
         const mVal = { base: r.monthlyBase, behavior: r.monthlyBehavior, performance: r.monthlyPerf }[cat];
         const pctVal = { base: r.fr, behavior: r.br, performance: r.pr }[cat];
-        return `<span style="color:${catColors[cat]};">${catLabels[cat]} ${mVal.toLocaleString()}/月（${pctVal}%）${c.error ? ' 🚫' : ''}</span>`;
+        return `<span style="color:${catColors[cat]};">${catLabels[cat]} NT$ ${c.target.toLocaleString()}/年（${pctVal}%）${c.error ? ' 🚫' : ''}</span>`;
       }).join('');
 
       return `<div style="border-bottom:1px solid #f1f5f9;">
@@ -480,7 +512,7 @@ function _step3HTML() {
           </div>
           <div style="display:flex;gap:12px;margin-top:2px;margin-left:22px;font-size:11px;flex-wrap:wrap;">
             ${catVals}
-            <span style="color:#475569;">合 ${r.monthlyTotal.toLocaleString()}/月 · ${r.annualTotal.toLocaleString()}/年 × ${a.headcount}人</span>
+            <span style="color:#475569;">合 ${r.monthlyTotal.toLocaleString()}/月 · ${r.allocatedAnnual.toLocaleString()}/年 × ${a.headcount}人${r.unallocated > 0 ? ` · 未配置 ${r.unallocated}%` : ''}</span>
           </div>
         </div>
         ${detailHtml}
@@ -496,7 +528,7 @@ function _step3HTML() {
     // Find over-budget sources per grade
     const overSources = alloc.map(a => {
       const r = calcAllocRow(a);
-      const rowTotal = r.annualTotal * (a.headcount || 0);
+      const rowTotal = r.allocatedAnnual * (a.headcount || 0);
       return { title: a.title, hc: a.headcount, annual: rowTotal, over: rowTotal - (a.annualTotal * (a.headcount || 0)) };
     }).filter(x => x.over > 0).slice(0, 3);
 
@@ -584,15 +616,17 @@ window.updAllocCell = function(deptId, idx, field, val) {
   renderStepContent();
 };
 
+let _debounceTimer;
+function _dbRender() { clearTimeout(_debounceTimer); _debounceTimer = setTimeout(() => { renderStepContent(); }, 200); }
+
 window.distribAllocPct = function(deptId, idx, cat, pctVal) {
   const alloc = data.deptConfigs[deptId]?.gradeAllocation;
   if (!alloc || !alloc[idx]) return;
-  const a = alloc[idx];
   const pct = Math.min(100, Math.max(0, parseInt(pctVal) || 0));
   const map = { base: 'fixedRatio', behavior: 'behaviorRatio', performance: 'performanceRatio' };
-  a[map[cat]] = pct;
+  alloc[idx][map[cat]] = pct;
   save();
-  renderStepContent();
+  _dbRender();
 };
 
 window.updAllocSubj = function(deptId, idx, cat, si, val) {
